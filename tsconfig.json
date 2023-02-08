@@ -31,7 +31,8 @@
     "src/stdlib/**/*.js",
     "node_modules",
     "dist",
-    "sicp_publish"
+    "sicp_publish",
+    "repl_source.ts"
   ],
   "types": [
     "typePatches",
