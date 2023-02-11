@@ -12,13 +12,13 @@ import {
   CalcParser,
   DivisionContext,
   ExpressionContext,
+  ModuloContext,
   MultiplicationContext,
   NumberContext,
   ParenthesesContext,
   PowerContext,
   StartContext,
-  SubtractionContext,
-  ModuloContext
+  SubtractionContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
