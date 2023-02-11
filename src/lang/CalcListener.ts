@@ -16,6 +16,7 @@ import { SubtractionContext } from "./CalcParser";
 import { ModuloContext } from "./CalcParser";
 import { EqualContext } from "./CalcParser";
 import { NequalContext } from "./CalcParser";
+import { ConditionalContext } from "./CalcParser";
 import { StartContext } from "./CalcParser";
 import { ExpressionContext } from "./CalcParser";
 
@@ -193,6 +194,19 @@ export interface CalcListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitNequal?: (ctx: NequalContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `Conditional`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	enterConditional?: (ctx: ConditionalContext) => void;
+	/**
+	 * Exit a parse tree produced by the `Conditional`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	exitConditional?: (ctx: ConditionalContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CalcParser.start`.

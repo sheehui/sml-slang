@@ -16,6 +16,7 @@ import { SubtractionContext } from "./CalcParser";
 import { ModuloContext } from "./CalcParser";
 import { EqualContext } from "./CalcParser";
 import { NequalContext } from "./CalcParser";
+import { ConditionalContext } from "./CalcParser";
 import { StartContext } from "./CalcParser";
 import { ExpressionContext } from "./CalcParser";
 
@@ -131,6 +132,14 @@ export interface CalcVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitNequal?: (ctx: NequalContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `Conditional`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitConditional?: (ctx: ConditionalContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CalcParser.start`.

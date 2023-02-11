@@ -17,6 +17,9 @@ BOOLEAN
    : 'true' 
    | 'false'
    ; 
+IF: 'if'; 
+ELSE: 'else';
+THEN: 'then'; 
 NUMBER: [0-9]+;
 WHITESPACE: [ \r\n\t]+ -> skip;
 
@@ -42,4 +45,6 @@ expression
    
    | left=expression operator=EQUAL right=expression  # Equal
    | left=expression operator=NEQUAL right=expression  # Nequal
+
+   | IF pred=expression THEN cons=expression ELSE alt=expression  # Conditional
    ;

@@ -142,7 +142,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
+    const test = yield* actualValue(node.test, context)
+    const cons = yield* actualValue(node.consequent, context)
+    const alt = yield* actualValue(node.alternate, context)
+    const error = rttc.checkIfStatement(node, test)
+    if (error) {
+      return handleRuntimeError(context, error)
+    }
+    
+    return test ? cons : alt
   },
 
   LogicalExpression: function* (node: es.LogicalExpression, context: Context) {

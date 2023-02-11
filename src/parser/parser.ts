@@ -23,7 +23,8 @@ import {
   NotContext,
   NegationContext,
   EqualContext,
-  NequalContext
+  NequalContext,
+  ConditionalContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
@@ -237,6 +238,15 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
+    }
+  }
+
+  visitConditional(ctx: ConditionalContext): es.Expression {
+    return {
+      type: "ConditionalExpression",
+      test: this.visit(ctx._pred),
+      alternate: this.visit(ctx._alt),
+      consequent: this.visit(ctx._cons),
     }
   }
 
