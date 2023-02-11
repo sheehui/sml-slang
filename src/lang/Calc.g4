@@ -5,9 +5,10 @@ grammar Calc;
  */
 POW: '^';
 MUL: '*';
-DIV: '/';
+DIV: 'div';
 ADD: '+';
 SUB: '-';
+MOD: 'mod';
 NUMBER: [0-9]+;
 WHITESPACE: [ \r\n\t]+ -> skip;
 
@@ -24,4 +25,5 @@ expression
    | left=expression operator=DIV right=expression  # Division
    | left=expression operator=ADD right=expression  # Addition
    | left=expression operator=SUB right=expression  # Subtraction
+   | left=expression operator=MOD right=expression  # Modulo
    ;

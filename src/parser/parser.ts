@@ -17,7 +17,8 @@ import {
   ParenthesesContext,
   PowerContext,
   StartContext,
-  SubtractionContext
+  SubtractionContext,
+  ModuloContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
@@ -174,6 +175,16 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     return {
       type: 'BinaryExpression',
       operator: '-',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitModulo(ctx: ModuloContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '%',
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
