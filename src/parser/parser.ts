@@ -1,5 +1,5 @@
 /* tslint:disable:max-classes-per-file */
-import { CharStreams, CommonTokenStream } from 'antlr4ts'
+import { CharStreams, CommonTokenStream, ParserRuleContext } from 'antlr4ts'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
 import { ParseTree } from 'antlr4ts/tree/ParseTree'
 import { RuleNode } from 'antlr4ts/tree/RuleNode'
@@ -9,6 +9,7 @@ import * as es from 'estree'
 import { CalcLexer } from '../lang/CalcLexer'
 import {
   AdditionContext,
+  BooleanContext,
   CalcParser,
   DivisionContext,
   ExpressionContext,
@@ -18,7 +19,11 @@ import {
   ParenthesesContext,
   PowerContext,
   StartContext,
-  SubtractionContext
+  SubtractionContext,
+  NotContext,
+  NegationContext,
+  EqualContext,
+  NequalContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
@@ -130,6 +135,30 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
+  visitBoolean(ctx: BooleanContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: ctx.text === 'true',
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitNot(ctx: NotContext): es.Expression {
+    return {
+      type: 'UnaryExpression',
+      operator: '~',
+      prefix: true,
+      argument: this.visit(ctx._right)
+    }
+  }
+  visitNegation(ctx: NegationContext): es.Expression {
+    return {
+      type: 'UnaryExpression',
+      operator: '-',
+      prefix: true,
+      argument: this.visit(ctx._right)
+    }
+  }
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expression())
   }
@@ -185,6 +214,26 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     return {
       type: 'BinaryExpression',
       operator: '%',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitEqual(ctx: EqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '===',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitNequal(ctx: NequalContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '!==',
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
