@@ -11,20 +11,20 @@ import {
   AdditionContext,
   BooleanContext,
   CalcParser,
+  ConditionalContext,
   DivisionContext,
+  EqualContext,
   ExpressionContext,
   ModuloContext,
   MultiplicationContext,
+  NegationContext,
+  NequalContext,
+  NotContext,
   NumberContext,
   ParenthesesContext,
   PowerContext,
   StartContext,
-  SubtractionContext,
-  NotContext,
-  NegationContext,
-  EqualContext,
-  NequalContext,
-  ConditionalContext
+  SubtractionContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
@@ -243,10 +243,10 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
 
   visitConditional(ctx: ConditionalContext): es.Expression {
     return {
-      type: "ConditionalExpression",
+      type: 'ConditionalExpression',
       test: this.visit(ctx._pred),
       alternate: this.visit(ctx._alt),
-      consequent: this.visit(ctx._cons),
+      consequent: this.visit(ctx._cons)
     }
   }
 

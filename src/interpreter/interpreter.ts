@@ -4,7 +4,13 @@ import * as es from 'estree'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Value } from '../types'
 import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
+import { Stack } from '../types'
 import * as rttc from '../utils/rttc'
+import { Statement } from 'estree'
+
+const step_limit = 1000000
+const A = new Stack<any>()
+const S = new Stack<Value>()
 
 class Thunk {
   public value: Value
@@ -84,7 +90,10 @@ function* evaluateBlockSatement(context: Context, node: es.BlockStatement) {
 export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   /** Simple Values */
   Literal: function* (node: es.Literal, _context: Context) {
-    return node.value
+    return {
+      tag: 'lit',
+      val: node.value
+    }
   },
 
   TemplateLiteral: function* (node: es.TemplateLiteral) {
@@ -122,23 +131,22 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
-    const value = yield* actualValue(node.argument, context)
-
-    const error = rttc.checkUnaryExpression(node, node.operator, value)
-    if (error) {
-      return handleRuntimeError(context, error)
+    return {
+      tag: 'unop',
+      sym: node.operator, 
+      arg: yield* evaluators[node.argument.type](node.argument, context)
     }
-    return evaluateUnaryExpression(node.operator, value)
   },
 
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
-    const left = yield* actualValue(node.left, context)
-    const right = yield* actualValue(node.right, context)
-    const error = rttc.checkBinaryExpression(node, node.operator, left, right)
-    if (error) {
-      return handleRuntimeError(context, error)
+    const frst = yield* evaluators[node.right.type](node.right, context)
+    const scnd = yield* evaluators[node.left.type](node.left, context)
+    return {
+      tag: 'binop',
+      sym: node.operator,
+      frst: frst,
+      scnd: scnd
     }
-    return evaluateBinaryExpression(node.operator, left, right)
   },
 
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
@@ -187,7 +195,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ExpressionStatement: function* (node: es.ExpressionStatement, context: Context) {
-    return yield* evaluate(node.expression, context)
+    return yield* evaluators[node.expression.type](node.expression, context)
   },
 
   ReturnStatement: function* (node: es.ReturnStatement, context: Context) {
@@ -204,14 +212,81 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Program: function* (node: es.BlockStatement, context: Context) {
-    const result = yield* forceIt(yield* evaluateBlockSatement(context, node), context);
-    return result;
+    const stmts = []; 
+    for (let i = node.body.length - 1; i >= 0; i--) {
+      const expr = node.body[i]
+      stmts.push(yield* evaluators[expr.type](expr, context))
+    }
+    const jsonBody = node.body.length > 1 ? {
+      tag: 'seq',
+      body: stmts
+    } : stmts[0]
+    
+    return {
+      tag: 'prog',
+      body: jsonBody
+    }
   }
+}
+
+const microcode : { [tag: string]: Function } = {
+  prog: (cmd: { body: any }) => {
+    const body = cmd.body 
+    A.push(body)
+  }, 
+  seq: (cmd: { body: any[] }) => {
+    for (let i = 0; i < cmd.body.length; i++) {
+      const expr = cmd.body[i]
+      A.push(expr)
+    }
+  },
+  lit: (cmd: { val: any }) => {
+    S.push(cmd.val)
+  },
+  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any }) => {
+    A.push({
+      tag: 'binop_i', 
+      sym: cmd.sym
+    })
+    A.push(cmd.scnd)
+    A.push(cmd.frst)
+  }, 
+  unop: (cmd: { sym: es.BinaryOperator; arg: any }) => {
+    A.push({
+      tag: 'unop_i',
+      sym: cmd.sym
+    })
+    A.push(cmd.arg)
+  }, 
+  binop_i: (cmd: { sym: es.BinaryOperator }) => {
+    const right = S.pop() 
+    const left = S.pop() 
+    S.push(evaluateBinaryExpression(cmd.sym, left, right))
+  },
+  unop_i: (cmd: { sym: es.UnaryOperator }) => {
+    const arg = S.pop()
+    S.push(evaluateUnaryExpression(cmd.sym, arg))
+  },
 }
 // tslint:enable:object-literal-shorthand
 
 export function* evaluate(node: es.Node, context: Context) {
-  const result = yield* evaluators[node.type](node, context)
+  A.push(yield* evaluators[node.type](node, context))
+  let i = 0; 
+  while (i < step_limit) {
+    if (A.size() === 0) break 
+    const cmd = A.pop()
+    if (cmd && microcode.hasOwnProperty(cmd.tag)) {
+      // S.print() // print stash
+      microcode[cmd.tag](cmd)
+    } else {
+      console.log("error")
+    }
+    i++; 
+  }
+
+  // const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
-  return result
+  const r = S.pop(); 
+  return r
 }
