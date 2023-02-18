@@ -292,16 +292,16 @@ function convertExpression(expression: ExpressionContext): es.Expression {
   return expression.accept(generator)
 }
 
-function convertSource(expression: ExpressionContext): es.Program {
+function convertSource(start: StartContext): es.Program {
   return {
     type: 'Program',
     sourceType: 'script',
-    body: [
-      {
+    body: start.expression().map(ctx => {
+      return {
         type: 'ExpressionStatement',
-        expression: convertExpression(expression)
+        expression: convertExpression(ctx)
       }
-    ]
+    })
   }
 }
 
@@ -315,7 +315,7 @@ export function parse(source: string, context: Context) {
     const parser = new CalcParser(tokenStream)
     parser.buildParseTree = true
     try {
-      const tree = parser.expression()
+      const tree = parser.start()
       program = convertSource(tree)
     } catch (error) {
       if (error instanceof FatalSyntaxError) {
