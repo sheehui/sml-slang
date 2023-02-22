@@ -7,10 +7,12 @@ import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/oper
 import { Stack } from '../types'
 import * as rttc from '../utils/rttc'
 import { Statement } from 'estree'
+import { createGlobalEnvironment } from '../createContext'
 
 const step_limit = 1000000
-const A = new Stack<any>()
-const S = new Stack<Value>()
+let A = new Stack<any>()
+let S = new Stack<Value>()
+let E = createGlobalEnvironment() 
 
 class Thunk {
   public value: Value
@@ -119,7 +121,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Identifier: function* (node: es.Identifier, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
+    return {
+      tag: 'id', 
+      sym: node.name
+    }
   },
 
   CallExpression: function* (node: es.CallExpression, context: Context) {
@@ -166,7 +171,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
+    const decl = node.declarations[0]
+    const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+    return {
+      tag: 'var',
+      id: decl.id.type === "Identifier" ? decl.id.name : null, // assume that vars are declared with identifier only 
+      expr
+    }
   },
 
   ContinueStatement: function* (_node: es.ContinueStatement, _context: Context) {
@@ -208,10 +219,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
 
   BlockStatement: function* (node: es.BlockStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  Program: function* (node: es.BlockStatement, context: Context) {
     const stmts = []; 
     for (let i = node.body.length - 1; i >= 0; i--) {
       const expr = node.body[i]
@@ -223,16 +230,33 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     } : stmts[0]
     
     return {
-      tag: 'prog',
+      tag: 'blk',
       body: jsonBody
     }
+  },
+
+  Program: function* (node: es.BlockStatement, context: Context) {
+    const progBlk = node.body[0]
+    return yield* evaluators[progBlk.type](progBlk, context); 
   }
+  
 }
 
 const microcode : { [tag: string]: Function } = {
-  prog: (cmd: { body: any }) => {
+  blk: (cmd: { body: any }) => {
+    if (A.size() > 0) {
+      A.push({tag: 'env_i', env: E}) 
+    }
     const body = cmd.body 
     A.push(body)
+
+    // extend environment by 1 frame for block 
+    E = {
+      head: {}, 
+      tail: E, 
+      id: E.id,  
+      name: 'program'
+    }
   }, 
   seq: (cmd: { body: any[] }) => {
     for (let i = 0; i < cmd.body.length; i++) {
@@ -243,6 +267,17 @@ const microcode : { [tag: string]: Function } = {
   lit: (cmd: { val: any }) => {
     S.push(cmd.val)
   },
+  id: (cmd: { sym: string }) => {
+    let env: Environment | null = E 
+    while (env) {
+      const frame = env.head 
+      if (frame.hasOwnProperty(cmd.sym)) {
+        return S.push(frame[cmd.sym])
+      }
+      env = E.tail 
+    }
+    console.log("error: cannot find variable in env") 
+  }, 
   binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any }) => {
     A.push({
       tag: 'binop_i', 
@@ -258,6 +293,15 @@ const microcode : { [tag: string]: Function } = {
     })
     A.push(cmd.arg)
   }, 
+  var: (cmd: { id: string, expr: any }) => {
+    // A.push({ tag: 'lit', val: undefined })
+    // A.push({ tag: 'pop_i'})
+    A.push({ tag: 'assmt', sym: cmd.id, expr: cmd.expr })
+  },
+  assmt: (cmd: { sym: string, expr: any }) => {
+    A.push({ tag: 'assmt_i', sym: cmd.sym }) 
+    A.push(cmd.expr) 
+  }, 
   binop_i: (cmd: { sym: es.BinaryOperator }) => {
     const right = S.pop() 
     const left = S.pop() 
@@ -267,10 +311,19 @@ const microcode : { [tag: string]: Function } = {
     const arg = S.pop()
     S.push(evaluateUnaryExpression(cmd.sym, arg))
   },
+  env_i: (cmd: { env: Environment }) => {
+    E = cmd.env 
+  },
+  assmt_i: (cmd: { sym: string }) => {
+    E.head[cmd.sym] = S.peek() 
+  }
 }
 // tslint:enable:object-literal-shorthand
 
 export function* evaluate(node: es.Node, context: Context) {
+  A = new Stack<any>()
+  S = new Stack<Value>()
+  E = createGlobalEnvironment() 
   A.push(yield* evaluators[node.type](node, context))
   let i = 0; 
   while (i < step_limit) {
