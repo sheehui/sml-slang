@@ -15,6 +15,7 @@ import {
   DivisionContext,
   EqualContext,
   ExpressionContext,
+  IdentifierContext,
   ModuloContext,
   MultiplicationContext,
   NegationContext,
@@ -24,7 +25,9 @@ import {
   ParenthesesContext,
   PowerContext,
   StartContext,
-  SubtractionContext
+  StmtContext,
+  SubtractionContext,
+  VarDecContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
 import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
@@ -142,6 +145,12 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       value: ctx.text === 'true',
       raw: ctx.text,
       loc: contextToLocation(ctx)
+    }
+  }
+  visitIdentifier(ctx: IdentifierContext) : es.Expression {
+    return {
+      type: 'Identifier', 
+      name: ctx.text
     }
   }
   visitNot(ctx: NotContext): es.Expression {
@@ -287,21 +296,104 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
-function convertExpression(expression: ExpressionContext): es.Expression {
-  const generator = new ExpressionGenerator()
-  return expression.accept(generator)
+class DeclarationGenerator implements CalcVisitor<es.Declaration> {
+  visitVarDec(ctx: VarDecContext) : es.Declaration {
+    return {
+      type: 'VariableDeclaration', 
+      declarations: [{
+        type: 'VariableDeclarator', 
+        id: {
+          type: 'Identifier', 
+          name: ctx._identifier.text! // '!' is a non-null assertion operator
+        }, 
+        init: new ExpressionGenerator().visit(ctx._value)
+      }], 
+      kind: 'const'
+    }
+  }
+  visit(tree: ParseTree): es.Declaration {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.Declaration {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.Declaration {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.Declaration {
+    throw new FatalSyntaxError(
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
+  }
+}
+
+class StmtGenerator implements CalcVisitor<es.Statement> {
+  visitStmt(ctx: StmtContext) : es.Statement {
+    if (ctx.expression()) {
+      const generator = new ExpressionGenerator()
+      return {
+        type: "ExpressionStatement", 
+        expression: ctx.expression()!.accept(generator), 
+      } as es.ExpressionStatement
+    } else {
+      const generator = new DeclarationGenerator()
+      return ctx.declaration()!.accept(generator)
+    }
+  }
+
+  visit(tree: ParseTree):es.Statement {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.Statement {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.Statement {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.Statement {
+    throw new FatalSyntaxError(
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
+  }
 }
 
 function convertSource(start: StartContext): es.Program {
+  const generator = new StmtGenerator()
   return {
     type: 'Program',
     sourceType: 'script',
-    body: start.expression().map(ctx => {
-      return {
-        type: 'ExpressionStatement',
-        expression: convertExpression(ctx)
-      }
-    })
+    body: [{
+      type: "BlockStatement",
+      body: start.stmt().map(ctx => {
+        return ctx.accept(generator)
+      })
+    }]
   }
 }
 

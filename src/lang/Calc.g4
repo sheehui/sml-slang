@@ -20,17 +20,26 @@ BOOLEAN
 IF: 'if'; 
 ELSE: 'else';
 THEN: 'then'; 
+VAL: 'val'; 
 NUMBER: [0-9]+;
+ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
 WHITESPACE: [ \r\n\t]+ -> skip;
 
 /*
  * Productions
  */
-start : (expression ';')+;
+start : (stmt ';')+;
+
+stmt 
+   : expression 
+   | declaration
+   ; 
 
 expression
    : NUMBER                                         # Number
    | BOOLEAN                                        # Boolean
+
+   | ID                                             # Identifier
 
    | operator=NEG right=expression                  # Negation
    | operator=NOT right=expression                  # Not
@@ -47,4 +56,8 @@ expression
    | left=expression operator=NEQUAL right=expression  # Nequal
 
    | IF pred=expression THEN cons=expression ELSE alt=expression  # Conditional
+   ;
+
+declaration
+   : VAL identifier=ID '=' value=expression       # VarDec
    ;
