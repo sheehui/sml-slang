@@ -16,6 +16,7 @@ import {
   DivisionContext,
   EqualContext,
   ExpressionContext,
+  FunDecContext,
   IdentifierContext,
   LocalDecContext,
   ModuloContext,
@@ -25,6 +26,7 @@ import {
   NotContext,
   NumberContext,
   ParenthesesContext,
+  PatternContext,
   PowerContext,
   SeqDeclContext,
   SeqExprContext,
@@ -329,6 +331,29 @@ class DeclarationGenerator implements CalcVisitor<es.VariableDeclarator[]> {
         init: new ExpressionGenerator().visit(ctx._value)
       }]
   }
+  visitFunDec(ctx: FunDecContext) : es.VariableDeclarator[] {
+    const identifier = {
+      type: 'Identifier', 
+      name: ctx._identifier.text!
+    } as es.Identifier
+
+    return [{
+      type: 'VariableDeclarator',
+      id: identifier,
+      init: {
+        type: 'FunctionExpression', 
+        id: identifier,
+        params: [new PatternGenerator().visitPattern(ctx.pattern())],
+        body: {
+          type: 'BlockStatement', 
+          body: [{
+            type: 'ExpressionStatement',
+            expression: new ExpressionGenerator().visit(ctx.expression())
+          }]
+        } 
+      }
+    }]
+  }
   visitSeqDec(ctx: SeqDeclContext) : es.VariableDeclarator[] {
     const ctxs = ctx.declaration()
     let declarations : es.VariableDeclarator[] = [] 
@@ -407,6 +432,56 @@ class StmtGenerator implements CalcVisitor<es.Statement> {
   }
 
   visitErrorNode(node: ErrorNode): es.Statement {
+    throw new FatalSyntaxError(
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
+  }
+}
+
+class PatternGenerator implements CalcVisitor<es.Pattern> {
+  visitPattern(ctx: PatternContext) : es.Pattern {
+    if (ctx.ID()) {
+      return {
+        type: 'Identifier', 
+        name: ctx.ID()?.text!
+      }
+    } else if (ctx.WILDC()) {
+      return {
+        type: 'Identifier', 
+        name: '_'
+      }
+    } else {
+      // number or boolean 
+      return {
+        type: 'Identifier', 
+        name: '_'
+      }
+    }
+  }
+
+  visit(tree: ParseTree):es.Pattern {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): es.Pattern {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): es.Pattern {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): es.Pattern {
     throw new FatalSyntaxError(
       {
         start: {

@@ -26,6 +26,7 @@ IN: 'in';
 END: 'end'; 
 FUN: 'fun'; 
 SEMIC: ';'; 
+WILDC: '_'; 
 NUMBER: [0-9]+;
 ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
 WHITESPACE: [ \r\n\t]+ -> skip;
@@ -74,4 +75,12 @@ seqDecl
 
 declaration
    : VAL identifier=ID EQUAL value=expression         # VarDec
+   | FUN identifier=ID params=pattern EQUAL value=expression    # FunDec
    ;
+
+pattern
+   : WILDC
+   | ID 
+   | NUMBER 
+   | BOOLEAN 
+   ; 

@@ -20,12 +20,14 @@ import { NequalContext } from "./CalcParser";
 import { ConditionalContext } from "./CalcParser";
 import { LocalDecContext } from "./CalcParser";
 import { VarDecContext } from "./CalcParser";
+import { FunDecContext } from "./CalcParser";
 import { StartContext } from "./CalcParser";
 import { StmtContext } from "./CalcParser";
 import { ExpressionContext } from "./CalcParser";
 import { SeqExprContext } from "./CalcParser";
 import { SeqDeclContext } from "./CalcParser";
 import { DeclarationContext } from "./CalcParser";
+import { PatternContext } from "./CalcParser";
 
 
 /**
@@ -255,6 +257,19 @@ export interface CalcListener extends ParseTreeListener {
 	exitVarDec?: (ctx: VarDecContext) => void;
 
 	/**
+	 * Enter a parse tree produced by the `FunDec`
+	 * labeled alternative in `CalcParser.declaration`.
+	 * @param ctx the parse tree
+	 */
+	enterFunDec?: (ctx: FunDecContext) => void;
+	/**
+	 * Exit a parse tree produced by the `FunDec`
+	 * labeled alternative in `CalcParser.declaration`.
+	 * @param ctx the parse tree
+	 */
+	exitFunDec?: (ctx: FunDecContext) => void;
+
+	/**
 	 * Enter a parse tree produced by `CalcParser.start`.
 	 * @param ctx the parse tree
 	 */
@@ -319,5 +334,16 @@ export interface CalcListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitDeclaration?: (ctx: DeclarationContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CalcParser.pattern`.
+	 * @param ctx the parse tree
+	 */
+	enterPattern?: (ctx: PatternContext) => void;
+	/**
+	 * Exit a parse tree produced by `CalcParser.pattern`.
+	 * @param ctx the parse tree
+	 */
+	exitPattern?: (ctx: PatternContext) => void;
 }
 

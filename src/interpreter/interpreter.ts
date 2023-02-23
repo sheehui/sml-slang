@@ -113,7 +113,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
+    return {
+      tag: 'lam', 
+      params: [yield* evaluators[node.params[0].type](node.params[0], context)],
+      body: yield* evaluators[node.body.type](node.body, context)
+    }
   },
 
   ArrowFunctionExpression: function* (node: es.ArrowFunctionExpression, context: Context) {
@@ -171,6 +175,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
+    console.log(node)
     // const decl = node.declarations[0]
     // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
     const ids = [] 
@@ -330,6 +335,9 @@ const microcode : { [tag: string]: Function } = {
     A.push({ tag: 'assmt_i', sym: cmd.sym }) 
     A.push(cmd.expr) 
   }, 
+  lam: (cmd: { params: any[], body: es.BlockStatement }) => {
+    S.push({ tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: E})
+  }, 
   binop_i: (cmd: { sym: es.BinaryOperator }) => {
     const right = S.pop() 
     const left = S.pop() 
@@ -359,7 +367,7 @@ export function* evaluate(node: es.Node, context: Context) {
     const cmd = A.pop()
     console.log(cmd)
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
-      // S.print() // print stash
+      S.print() // print stash
       microcode[cmd.tag](cmd)
     } else {
       console.log("error")
