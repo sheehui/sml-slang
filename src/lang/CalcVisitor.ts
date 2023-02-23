@@ -18,10 +18,13 @@ import { ModuloContext } from "./CalcParser";
 import { EqualContext } from "./CalcParser";
 import { NequalContext } from "./CalcParser";
 import { ConditionalContext } from "./CalcParser";
+import { LocalDecContext } from "./CalcParser";
 import { VarDecContext } from "./CalcParser";
 import { StartContext } from "./CalcParser";
 import { StmtContext } from "./CalcParser";
 import { ExpressionContext } from "./CalcParser";
+import { SeqExprContext } from "./CalcParser";
+import { SeqDeclContext } from "./CalcParser";
 import { DeclarationContext } from "./CalcParser";
 
 
@@ -154,6 +157,14 @@ export interface CalcVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitConditional?: (ctx: ConditionalContext) => Result;
 
 	/**
+	 * Visit a parse tree produced by the `LocalDec`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitLocalDec?: (ctx: LocalDecContext) => Result;
+
+	/**
 	 * Visit a parse tree produced by the `VarDec`
 	 * labeled alternative in `CalcParser.declaration`.
 	 * @param ctx the parse tree
@@ -181,6 +192,20 @@ export interface CalcVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitExpression?: (ctx: ExpressionContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CalcParser.seqExpr`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitSeqExpr?: (ctx: SeqExprContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CalcParser.seqDecl`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitSeqDecl?: (ctx: SeqDeclContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CalcParser.declaration`.

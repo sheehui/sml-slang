@@ -171,12 +171,18 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
-    const decl = node.declarations[0]
-    const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+    // const decl = node.declarations[0]
+    // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+    const ids = [] 
+    const exprs = [] 
+    for (const decl of node.declarations) {
+      ids.push(decl.id.type === "Identifier" ? decl.id.name : null) // assume that vars are declared with identifier only
+      exprs.push(yield* evaluators[decl.init!.type](decl.init!, context))
+    }
     return {
       tag: 'var',
-      id: decl.id.type === "Identifier" ? decl.id.name : null, // assume that vars are declared with identifier only 
-      expr
+      ids, 
+      exprs
     }
   },
 
@@ -209,6 +215,25 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return yield* evaluators[node.expression.type](node.expression, context)
   },
 
+  SequenceExpression: function* (node: es.SequenceExpression, context: Context) {
+    const body = []
+    for (let i = 0; i < node.expressions.length; i++) {
+      const expr = node.expressions[i]
+      body.push(yield* evaluators[expr.type](expr, context))
+    }
+    const locals = (node as any).locals 
+    return locals ? {
+      tag: 'blk', 
+      body: { 
+        tag: 'seq', 
+        body: [yield* evaluators[locals.type](locals, context), ...body] 
+      }
+    } : {
+      tag: 'seq',
+      body,
+    }
+  },
+
   ReturnStatement: function* (node: es.ReturnStatement, context: Context) {
     throw new Error(`not supported yet: ${node.type}`)
   },
@@ -220,7 +245,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   BlockStatement: function* (node: es.BlockStatement, context: Context) {
     const stmts = []; 
-    for (let i = node.body.length - 1; i >= 0; i--) {
+    for (let i = 0; i < node.body.length; i++) {
       const expr = node.body[i]
       stmts.push(yield* evaluators[expr.type](expr, context))
     }
@@ -259,7 +284,7 @@ const microcode : { [tag: string]: Function } = {
     }
   }, 
   seq: (cmd: { body: any[] }) => {
-    for (let i = 0; i < cmd.body.length; i++) {
+    for (let i = cmd.body.length - 1; i >= 0; i--) {
       const expr = cmd.body[i]
       A.push(expr)
     }
@@ -274,7 +299,7 @@ const microcode : { [tag: string]: Function } = {
       if (frame.hasOwnProperty(cmd.sym)) {
         return S.push(frame[cmd.sym])
       }
-      env = E.tail 
+      env = env.tail 
     }
     console.log("error: cannot find variable in env") 
   }, 
@@ -293,10 +318,13 @@ const microcode : { [tag: string]: Function } = {
     })
     A.push(cmd.arg)
   }, 
-  var: (cmd: { id: string, expr: any }) => {
+  var: (cmd: { ids: string[], exprs: any[] }) => {
     // A.push({ tag: 'lit', val: undefined })
     // A.push({ tag: 'pop_i'})
-    A.push({ tag: 'assmt', sym: cmd.id, expr: cmd.expr })
+    for (let i = cmd.exprs.length - 1; i >= 0; i--) {
+      A.push({ tag: 'assmt', sym: cmd.ids[i], expr: cmd.exprs[i] })
+    }
+    // A.push({ tag: 'assmt', sym: cmd.id, expr: cmd.expr })
   },
   assmt: (cmd: { sym: string, expr: any }) => {
     A.push({ tag: 'assmt_i', sym: cmd.sym }) 
@@ -329,6 +357,7 @@ export function* evaluate(node: es.Node, context: Context) {
   while (i < step_limit) {
     if (A.size() === 0) break 
     const cmd = A.pop()
+    console.log(cmd)
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
       // S.print() // print stash
       microcode[cmd.tag](cmd)

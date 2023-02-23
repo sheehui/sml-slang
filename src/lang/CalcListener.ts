@@ -18,10 +18,13 @@ import { ModuloContext } from "./CalcParser";
 import { EqualContext } from "./CalcParser";
 import { NequalContext } from "./CalcParser";
 import { ConditionalContext } from "./CalcParser";
+import { LocalDecContext } from "./CalcParser";
 import { VarDecContext } from "./CalcParser";
 import { StartContext } from "./CalcParser";
 import { StmtContext } from "./CalcParser";
 import { ExpressionContext } from "./CalcParser";
+import { SeqExprContext } from "./CalcParser";
+import { SeqDeclContext } from "./CalcParser";
 import { DeclarationContext } from "./CalcParser";
 
 
@@ -226,6 +229,19 @@ export interface CalcListener extends ParseTreeListener {
 	exitConditional?: (ctx: ConditionalContext) => void;
 
 	/**
+	 * Enter a parse tree produced by the `LocalDec`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	enterLocalDec?: (ctx: LocalDecContext) => void;
+	/**
+	 * Exit a parse tree produced by the `LocalDec`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	exitLocalDec?: (ctx: LocalDecContext) => void;
+
+	/**
 	 * Enter a parse tree produced by the `VarDec`
 	 * labeled alternative in `CalcParser.declaration`.
 	 * @param ctx the parse tree
@@ -270,6 +286,28 @@ export interface CalcListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitExpression?: (ctx: ExpressionContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CalcParser.seqExpr`.
+	 * @param ctx the parse tree
+	 */
+	enterSeqExpr?: (ctx: SeqExprContext) => void;
+	/**
+	 * Exit a parse tree produced by `CalcParser.seqExpr`.
+	 * @param ctx the parse tree
+	 */
+	exitSeqExpr?: (ctx: SeqExprContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CalcParser.seqDecl`.
+	 * @param ctx the parse tree
+	 */
+	enterSeqDecl?: (ctx: SeqDeclContext) => void;
+	/**
+	 * Exit a parse tree produced by `CalcParser.seqDecl`.
+	 * @param ctx the parse tree
+	 */
+	exitSeqDecl?: (ctx: SeqDeclContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CalcParser.declaration`.

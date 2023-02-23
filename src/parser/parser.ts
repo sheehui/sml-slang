@@ -12,10 +12,12 @@ import {
   BooleanContext,
   CalcParser,
   ConditionalContext,
+  DeclarationContext,
   DivisionContext,
   EqualContext,
   ExpressionContext,
   IdentifierContext,
+  LocalDecContext,
   ModuloContext,
   MultiplicationContext,
   NegationContext,
@@ -24,6 +26,8 @@ import {
   NumberContext,
   ParenthesesContext,
   PowerContext,
+  SeqDeclContext,
+  SeqExprContext,
   StartContext,
   StmtContext,
   SubtractionContext,
@@ -259,6 +263,24 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
+  visitLocalDec(ctx: LocalDecContext) : es.Expression {
+    const expressions = this.visitSeqExpr(ctx._expr)
+    expressions["locals"] = {
+      type: 'VariableDeclaration',
+      declarations: new DeclarationGenerator().visitSeqDec(ctx._decl),
+      kind: 'const'
+    } 
+    return expressions
+  }
+
+  visitSeqExpr(ctx: SeqExprContext) : es.Expression {
+    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
+    return {
+      type: 'SequenceExpression',
+      expressions
+    }
+  }
+
   visitExpression?: ((ctx: ExpressionContext) => es.Expression) | undefined
   visitStart?: ((ctx: StartContext) => es.Expression) | undefined
 
@@ -296,34 +318,47 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
-class DeclarationGenerator implements CalcVisitor<es.Declaration> {
-  visitVarDec(ctx: VarDecContext) : es.Declaration {
-    return {
-      type: 'VariableDeclaration', 
-      declarations: [{
+class DeclarationGenerator implements CalcVisitor<es.VariableDeclarator[]> {
+  visitVarDec(ctx: VarDecContext) : es.VariableDeclarator[] {
+    return [{
         type: 'VariableDeclarator', 
         id: {
           type: 'Identifier', 
           name: ctx._identifier.text! // '!' is a non-null assertion operator
         }, 
         init: new ExpressionGenerator().visit(ctx._value)
-      }], 
-      kind: 'const'
-    }
+      }]
   }
-  visit(tree: ParseTree): es.Declaration {
+  visitSeqDec(ctx: SeqDeclContext) : es.VariableDeclarator[] {
+    const ctxs = ctx.declaration()
+    let declarations : es.VariableDeclarator[] = [] 
+    for (let i = 0; i < ctxs.length; i++) {
+      declarations = declarations.concat(ctxs[i].accept(this)); 
+    }
+    return declarations 
+  }
+
+  visitDeclaration(ctx: DeclarationContext) : es.VariableDeclarator[] {
+    return this.visitVarDec(ctx as VarDecContext)
+  }
+
+  visit(tree: ParseTree): es.VariableDeclarator[] {
     return tree.accept(this)
   }
 
-  visitChildren(node: RuleNode): es.Declaration {
+  visitChildren(node: RuleNode): es.VariableDeclarator[] {
+    const decs: es.VariableDeclarator[] = []
+    for (let i = 0; i < node.childCount; i++) {
+      decs.concat(node.getChild(i).accept(this))
+    }
+    return decs
+  }
+
+  visitTerminal(node: TerminalNode): es.VariableDeclarator[] {
     return node.accept(this)
   }
 
-  visitTerminal(node: TerminalNode): es.Declaration {
-    return node.accept(this)
-  }
-
-  visitErrorNode(node: ErrorNode): es.Declaration {
+  visitErrorNode(node: ErrorNode): es.VariableDeclarator[] {
     throw new FatalSyntaxError(
       {
         start: {
@@ -342,15 +377,20 @@ class DeclarationGenerator implements CalcVisitor<es.Declaration> {
 
 class StmtGenerator implements CalcVisitor<es.Statement> {
   visitStmt(ctx: StmtContext) : es.Statement {
-    if (ctx.expression()) {
+    if (ctx.seqExpr()) {
       const generator = new ExpressionGenerator()
       return {
         type: "ExpressionStatement", 
-        expression: ctx.expression()!.accept(generator), 
+        expression: generator.visitSeqExpr(ctx.seqExpr()!), 
       } as es.ExpressionStatement
     } else {
       const generator = new DeclarationGenerator()
-      return ctx.declaration()!.accept(generator)
+      const declarations = generator.visitSeqDec(ctx.seqDecl()!)
+      return {
+        type: 'VariableDeclaration',
+        declarations,
+        kind: 'const'
+      }
     }
   }
 

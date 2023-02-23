@@ -21,6 +21,11 @@ IF: 'if';
 ELSE: 'else';
 THEN: 'then'; 
 VAL: 'val'; 
+LET: 'let'; 
+IN: 'in'; 
+END: 'end'; 
+FUN: 'fun'; 
+SEMIC: ';'; 
 NUMBER: [0-9]+;
 ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
 WHITESPACE: [ \r\n\t]+ -> skip;
@@ -28,11 +33,11 @@ WHITESPACE: [ \r\n\t]+ -> skip;
 /*
  * Productions
  */
-start : (stmt ';')+;
+start : (stmt)+;
 
 stmt 
-   : expression 
-   | declaration
+   : seqExpr 
+   | seqDecl
    ; 
 
 expression
@@ -52,12 +57,21 @@ expression
    | left=expression operator=SUB right=expression  # Subtraction
    | left=expression operator=MOD right=expression  # Modulo
    
-   | left=expression operator=EQUAL right=expression  # Equal
+   | left=expression operator=EQUAL right=expression   # Equal
    | left=expression operator=NEQUAL right=expression  # Nequal
 
    | IF pred=expression THEN cons=expression ELSE alt=expression  # Conditional
+   | LET decl=seqDecl IN expr=seqExpr END    # LocalDec
+   ;
+
+seqExpr
+   : (expression SEMIC)+
+   ;
+
+seqDecl
+   : (declaration SEMIC)+
    ;
 
 declaration
-   : VAL identifier=ID '=' value=expression       # VarDec
+   : VAL identifier=ID EQUAL value=expression         # VarDec
    ;
