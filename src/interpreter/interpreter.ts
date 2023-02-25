@@ -108,9 +108,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ArrayExpression: function* (node: es.ArrayExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
+    return node.leadingComments?.values[0] === "list" 
+        ? {
+          tag: 'list',
+          elems: node.elements
+        }
+        : {
+          tag: 'tuple',
+          elems: node.elements
+        }
   },
-
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
     return {
@@ -337,7 +344,10 @@ const microcode : { [tag: string]: Function } = {
   }, 
   lam: (cmd: { params: any[], body: es.BlockStatement }) => {
     S.push({ tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: E})
-  }, 
+  },
+  list: (cmd: {elems: any[]}) => {
+    
+  },
   binop_i: (cmd: { sym: es.BinaryOperator }) => {
     const right = S.pop() 
     const left = S.pop() 

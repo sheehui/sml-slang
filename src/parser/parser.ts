@@ -22,6 +22,7 @@ import {
   IdentifierContext,
   LessThanContext,
   LessThanOrEqualContext,
+  ListContext,
   LocalDecContext,
   ModuloContext,
   MultiplicationContext,
@@ -306,6 +307,15 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       test: this.visit(ctx._pred),
       alternate: this.visit(ctx._alt),
       consequent: this.visit(ctx._cons)
+    }
+  }
+
+  visitList(ctx: ListContext): es.Expression {
+    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
+    return {
+      type: 'ArrayExpression',
+      elements: expressions,
+      leadingComments: [{type: "Line", value: "list"}]
     }
   }
 

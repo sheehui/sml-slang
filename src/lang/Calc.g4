@@ -51,6 +51,8 @@ expression
 
    | ID                                             # Identifier
 
+   | '[' ( expression ( ',' expression )* )? ']'    # List
+
    | operator=NEG right=expression                  # Negation
    | operator=NOT right=expression                  # Not
 

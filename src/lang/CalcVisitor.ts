@@ -6,6 +6,7 @@ import { ParseTreeVisitor } from "antlr4ts/tree/ParseTreeVisitor";
 import { NumberContext } from "./CalcParser";
 import { BooleanContext } from "./CalcParser";
 import { IdentifierContext } from "./CalcParser";
+import { ListContext } from "./CalcParser";
 import { NegationContext } from "./CalcParser";
 import { NotContext } from "./CalcParser";
 import { ParenthesesContext } from "./CalcParser";
@@ -65,6 +66,14 @@ export interface CalcVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitIdentifier?: (ctx: IdentifierContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `List`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitList?: (ctx: ListContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by the `Negation`

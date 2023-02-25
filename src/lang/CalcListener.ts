@@ -6,6 +6,7 @@ import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
 import { NumberContext } from "./CalcParser";
 import { BooleanContext } from "./CalcParser";
 import { IdentifierContext } from "./CalcParser";
+import { ListContext } from "./CalcParser";
 import { NegationContext } from "./CalcParser";
 import { NotContext } from "./CalcParser";
 import { ParenthesesContext } from "./CalcParser";
@@ -77,6 +78,19 @@ export interface CalcListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitIdentifier?: (ctx: IdentifierContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `List`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	enterList?: (ctx: ListContext) => void;
+	/**
+	 * Exit a parse tree produced by the `List`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	exitList?: (ctx: ListContext) => void;
 
 	/**
 	 * Enter a parse tree produced by the `Negation`
