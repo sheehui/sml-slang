@@ -15,6 +15,10 @@ import { DivisionContext } from "./CalcParser";
 import { AdditionContext } from "./CalcParser";
 import { SubtractionContext } from "./CalcParser";
 import { ModuloContext } from "./CalcParser";
+import { GreaterThanContext } from "./CalcParser";
+import { GreaterThanOrEqualContext } from "./CalcParser";
+import { LessThanContext } from "./CalcParser";
+import { LessThanOrEqualContext } from "./CalcParser";
 import { EqualContext } from "./CalcParser";
 import { NequalContext } from "./CalcParser";
 import { ConditionalContext } from "./CalcParser";
@@ -133,6 +137,38 @@ export interface CalcVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitModulo?: (ctx: ModuloContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `GreaterThan`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitGreaterThan?: (ctx: GreaterThanContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `GreaterThanOrEqual`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitGreaterThanOrEqual?: (ctx: GreaterThanOrEqualContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `LessThan`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitLessThan?: (ctx: LessThanContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `LessThanOrEqual`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitLessThanOrEqual?: (ctx: LessThanOrEqualContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by the `Equal`

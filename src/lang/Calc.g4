@@ -10,6 +10,10 @@ ADD: '+';
 SUB: '-';
 MOD: 'mod';
 EQUAL: '=';
+GT: '>';
+GTE: '>=';
+LT: '<';
+LTE: '<=';
 NEQUAL: '<>';
 NOT: 'not';
 NEG: '~'; 
@@ -58,6 +62,10 @@ expression
    | left=expression operator=SUB right=expression  # Subtraction
    | left=expression operator=MOD right=expression  # Modulo
    
+   | left=expression operator=GT right=expression      # GreaterThan
+   | left=expression operator=GTE right=expression      # GreaterThanOrEqual
+   | left=expression operator=LT right=expression      # LessThan 
+   | left=expression operator=LTE right=expression      # LessThanOrEqual 
    | left=expression operator=EQUAL right=expression   # Equal
    | left=expression operator=NEQUAL right=expression  # Nequal
 

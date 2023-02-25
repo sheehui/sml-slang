@@ -17,7 +17,11 @@ import {
   EqualContext,
   ExpressionContext,
   FunDecContext,
+  GreaterThanContext,
+  GreaterThanOrEqualContext,
   IdentifierContext,
+  LessThanContext,
+  LessThanOrEqualContext,
   LocalDecContext,
   ModuloContext,
   MultiplicationContext,
@@ -230,6 +234,46 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     return {
       type: 'BinaryExpression',
       operator: '%',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitGreaterThan(ctx: GreaterThanContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '>',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitGreaterThanOrEqual(ctx: GreaterThanOrEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '>=',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitLessThan(ctx: LessThanContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '<',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
+    }
+  }
+
+  visitLessThanOrEqual(ctx: LessThanOrEqualContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '<=',
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)

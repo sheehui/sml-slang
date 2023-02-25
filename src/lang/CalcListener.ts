@@ -15,6 +15,10 @@ import { DivisionContext } from "./CalcParser";
 import { AdditionContext } from "./CalcParser";
 import { SubtractionContext } from "./CalcParser";
 import { ModuloContext } from "./CalcParser";
+import { GreaterThanContext } from "./CalcParser";
+import { GreaterThanOrEqualContext } from "./CalcParser";
+import { LessThanContext } from "./CalcParser";
+import { LessThanOrEqualContext } from "./CalcParser";
 import { EqualContext } from "./CalcParser";
 import { NequalContext } from "./CalcParser";
 import { ConditionalContext } from "./CalcParser";
@@ -190,6 +194,58 @@ export interface CalcListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitModulo?: (ctx: ModuloContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `GreaterThan`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	enterGreaterThan?: (ctx: GreaterThanContext) => void;
+	/**
+	 * Exit a parse tree produced by the `GreaterThan`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	exitGreaterThan?: (ctx: GreaterThanContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `GreaterThanOrEqual`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	enterGreaterThanOrEqual?: (ctx: GreaterThanOrEqualContext) => void;
+	/**
+	 * Exit a parse tree produced by the `GreaterThanOrEqual`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	exitGreaterThanOrEqual?: (ctx: GreaterThanOrEqualContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `LessThan`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	enterLessThan?: (ctx: LessThanContext) => void;
+	/**
+	 * Exit a parse tree produced by the `LessThan`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	exitLessThan?: (ctx: LessThanContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `LessThanOrEqual`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	enterLessThanOrEqual?: (ctx: LessThanOrEqualContext) => void;
+	/**
+	 * Exit a parse tree produced by the `LessThanOrEqual`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 */
+	exitLessThanOrEqual?: (ctx: LessThanOrEqualContext) => void;
 
 	/**
 	 * Enter a parse tree produced by the `Equal`

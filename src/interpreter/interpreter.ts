@@ -313,8 +313,8 @@ const microcode : { [tag: string]: Function } = {
       tag: 'binop_i', 
       sym: cmd.sym
     })
-    A.push(cmd.scnd)
     A.push(cmd.frst)
+    A.push(cmd.scnd)
   }, 
   unop: (cmd: { sym: es.BinaryOperator; arg: any }) => {
     A.push({
