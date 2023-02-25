@@ -57,6 +57,7 @@ expression
    | operator=NOT right=expression                  # Not
 
    | '(' inner=expression ')'                       # Parentheses
+   | '(' ( expression ( ',' expression )* )? ')'    # Tuple
    | left=expression operator=POW right=expression  # Power
    | left=expression operator=MUL right=expression  # Multiplication
    | left=expression operator=DIV right=expression  # Division

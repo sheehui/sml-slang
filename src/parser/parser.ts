@@ -1,5 +1,5 @@
 /* tslint:disable:max-classes-per-file */
-import { CharStreams, CommonTokenStream, ParserRuleContext } from 'antlr4ts'
+import { CharStreams, CommonTokenStream } from 'antlr4ts'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
 import { ParseTree } from 'antlr4ts/tree/ParseTree'
 import { RuleNode } from 'antlr4ts/tree/RuleNode'
@@ -38,6 +38,7 @@ import {
   StartContext,
   StmtContext,
   SubtractionContext,
+  TupleContext,
   VarDecContext
 } from '../lang/CalcParser'
 import { CalcVisitor } from '../lang/CalcVisitor'
@@ -316,6 +317,15 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       type: 'ArrayExpression',
       elements: expressions,
       leadingComments: [{type: "Line", value: "list"}]
+    }
+  }
+
+  visitTuple(ctx: TupleContext): es.Expression {
+    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
+    return {
+      type: 'ArrayExpression',
+      elements: expressions,
+      leadingComments: [{type: "Line", value: "tuple"}]
     }
   }
 

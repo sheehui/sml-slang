@@ -10,6 +10,7 @@ import { ListContext } from "./CalcParser";
 import { NegationContext } from "./CalcParser";
 import { NotContext } from "./CalcParser";
 import { ParenthesesContext } from "./CalcParser";
+import { TupleContext } from "./CalcParser";
 import { PowerContext } from "./CalcParser";
 import { MultiplicationContext } from "./CalcParser";
 import { DivisionContext } from "./CalcParser";
@@ -98,6 +99,14 @@ export interface CalcVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitParentheses?: (ctx: ParenthesesContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by the `Tuple`
+	 * labeled alternative in `CalcParser.expression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitTuple?: (ctx: TupleContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by the `Power`

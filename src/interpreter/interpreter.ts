@@ -1,13 +1,13 @@
 /* tslint:disable:max-classes-per-file */
 import * as es from 'estree'
+import { Statement } from 'estree'
 
+import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Value } from '../types'
-import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import { Stack } from '../types'
+import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
 import * as rttc from '../utils/rttc'
-import { Statement } from 'estree'
-import { createGlobalEnvironment } from '../createContext'
 
 const step_limit = 1000000
 let A = new Stack<any>()
@@ -346,6 +346,9 @@ const microcode : { [tag: string]: Function } = {
     S.push({ tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: E})
   },
   list: (cmd: {elems: any[]}) => {
+    
+  },
+  tuple: (cmd: {elems: any[]}) => {
     
   },
   binop_i: (cmd: { sym: es.BinaryOperator }) => {
