@@ -108,15 +108,14 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ArrayExpression: function* (node: es.ArrayExpression, context: Context) {
+    const elems = []
+    for (let i = 0; i < node.elements.length; i++) {
+      const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
+      elems.push(elem)
+    }
     return node.leadingComments![0].value === "list" 
-        ? {
-          tag: 'list_lit',
-          elems: node.elements.map(x => evaluators[x!.type]).reverse()
-        }
-        : {
-          tag: 'tuple_lit',
-          elems: node.elements.map(x => evaluators[x!.type]).reverse()
-        }
+        ? { tag: 'list_lit', elems }
+        : { tag: 'tuple_lit', elems }
   },
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
@@ -346,10 +345,16 @@ const microcode : { [tag: string]: Function } = {
     S.push({ tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: E})
   },
   list_lit: (cmd: {elems: any[]}) => {
-    S.push(cmd.elems)
+    A.push({ tag: 'list_lit_i', len: cmd.elems.length })
+    cmd.elems.forEach(x => {
+      A.push(x)
+    })
   },
   tuple_lit: (cmd: {elems: any[]}) => {
-    S.push(cmd.elems)
+    A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
+    cmd.elems.forEach(x => {
+      A.push(x)
+    })
   },
   binop_i: (cmd: { sym: es.BinaryOperator }) => {
     const right = S.pop() 
@@ -365,11 +370,25 @@ const microcode : { [tag: string]: Function } = {
   },
   assmt_i: (cmd: { sym: string }) => {
     E.head[cmd.sym] = S.peek() 
+  },
+  list_lit_i: (cmd: {len: number}) => {
+    const list = []
+    for (let i = 0; i < cmd.len; i++) {
+      list.push(S.pop())
+    }
+    S.push(list)
+  },
+  tuple_lit_i: (cmd: {len: number}) => {
+    const list = []
+    for (let i = 0; i < cmd.len; i++) {
+      list.push(S.pop())
+    }
+    S.push(list)
   }
 }
 // tslint:enable:object-literal-shorthand
 
-export function* evaluate(node: es.Node, context: Context) {
+export function* evaluate(node: es.Node, context: Context) : any{
   A = new Stack<any>()
   S = new Stack<Value>()
   E = createGlobalEnvironment() 
@@ -378,6 +397,7 @@ export function* evaluate(node: es.Node, context: Context) {
   while (i < step_limit) {
     if (A.size() === 0) break 
     const cmd = A.pop()
+    console.log("=====instruction====")
     console.log(cmd)
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
       S.print() // print stash
