@@ -392,6 +392,7 @@ export function* evaluate(node: es.Node, context: Context) : any{
   A = new Stack<any>()
   S = new Stack<Value>()
   E = createGlobalEnvironment() 
+  console.log("=====START EVALUATION=====")
   A.push(yield* evaluators[node.type](node, context))
   let i = 0; 
   while (i < step_limit) {
@@ -400,6 +401,7 @@ export function* evaluate(node: es.Node, context: Context) : any{
     console.log("=====instruction====")
     console.log(cmd)
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
+      console.log("stash:")
       S.print() // print stash
       microcode[cmd.tag](cmd)
     } else {
@@ -410,6 +412,7 @@ export function* evaluate(node: es.Node, context: Context) : any{
 
   // const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
+  console.log("=====EXIT EVALUATION=====")
   const r = S.pop(); 
   return r
 }
