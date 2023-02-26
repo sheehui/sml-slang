@@ -398,7 +398,7 @@ export function* evaluate(node: es.Node, context: Context) : any{
   while (i < step_limit) {
     if (A.size() === 0) break 
     const cmd = A.pop()
-    console.log("=====instruction====")
+    console.log("\n=====instruction====")
     console.log(cmd)
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
       console.log("stash:")
@@ -412,7 +412,7 @@ export function* evaluate(node: es.Node, context: Context) : any{
 
   // const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
-  console.log("=====EXIT EVALUATION=====")
+  console.log("\n=====EXIT EVALUATION=====\n")
   const r = S.pop(); 
   return r
 }
