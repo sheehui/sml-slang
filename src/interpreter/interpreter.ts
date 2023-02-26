@@ -164,6 +164,17 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
+  MemberExpression: function* (node: es.MemberExpression, context: Context) {
+    const expr = node.object.type === "ArrayExpression" 
+            ? yield* evaluators[node.object.type](node.object, context)
+            : node.object
+    return {
+      tag: 'record',
+      record: node.property,
+      expr
+    }
+  },
+
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
     const test = yield* actualValue(node.test, context)
     const cons = yield* actualValue(node.consequent, context)
@@ -356,6 +367,18 @@ const microcode : { [tag: string]: Function } = {
       A.push(x)
     })
   },
+  record: (cmd: {record: any, expr: any}) => {
+    const index = cmd.record.value - 1 // input is 1-indexed
+    A.push({tag: 'record_i', index})
+
+    if (cmd.expr.tag === 'tuple_lit') {
+      A.push(cmd.expr)
+    }
+
+    if (cmd.expr.type === 'Identifier') {
+      A.push({tag: 'id', sym: cmd.expr.name})
+    }
+  },
   binop_i: (cmd: { sym: es.BinaryOperator }) => {
     const right = S.pop() 
     const left = S.pop() 
@@ -371,19 +394,28 @@ const microcode : { [tag: string]: Function } = {
   assmt_i: (cmd: { sym: string }) => {
     E.head[cmd.sym] = S.peek() 
   },
-  list_lit_i: (cmd: {len: number}) => {
+  list_lit_i: (cmd: { len: number }) => {
     const list = []
     for (let i = 0; i < cmd.len; i++) {
       list.push(S.pop())
     }
     S.push(list)
   },
-  tuple_lit_i: (cmd: {len: number}) => {
+  tuple_lit_i: (cmd: { len: number }) => {
     const list = []
     for (let i = 0; i < cmd.len; i++) {
       list.push(S.pop())
     }
     S.push(list)
+  },
+  record_i: (cmd : { index: number }) => {
+    const tuple = S.pop()
+
+    if (cmd.index < 0 || cmd.index >= tuple.length) {
+      throw Error("index out of bounds")
+    }
+
+    S.push(tuple[cmd.index])
   }
 }
 // tslint:enable:object-literal-shorthand

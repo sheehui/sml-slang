@@ -5,6 +5,7 @@ grammar Calc;
  */
 POW: '^';
 MUL: '*';
+HASH: '#';
 DIV: 'div';
 ADD: '+';
 SUB: '-';
@@ -31,9 +32,12 @@ END: 'end';
 FUN: 'fun'; 
 SEMIC: ';'; 
 WILDC: '_'; 
-NUMBER: [0-9]+;
+NUMBER: DIGIT+;
+TUPLE_ACCESS: HASH [1-9] DIGIT*;
 ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
 WHITESPACE: [ \r\n\t]+ -> skip;
+
+fragment DIGIT: [0-9];
 
 /*
  * Productions
@@ -52,6 +56,7 @@ expression
    | ID                                             # Identifier
 
    | '[' ( expression ( ',' expression )* )? ']'    # List
+   | record=TUPLE_ACCESS expr=expression            # TupleAccess
 
    | operator=NEG right=expression                  # Negation
    | operator=NOT right=expression                  # Not

@@ -38,6 +38,7 @@ import {
   StartContext,
   StmtContext,
   SubtractionContext,
+  TupleAccessContext,
   TupleContext,
   VarDecContext
 } from '../lang/CalcParser'
@@ -326,6 +327,22 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       type: 'ArrayExpression',
       elements: expressions,
       leadingComments: [{type: "Line", value: "tuple"}]
+    }
+  }
+
+  visitTupleAccess(ctx: TupleAccessContext): es.Expression {
+    const literal : es.Expression =  {
+      type: 'Literal',
+      value: parseInt(ctx._record.text!.substring(1)),
+      raw: ctx._record.text,
+      loc: contextToLocation(ctx)
+    }
+    return {
+      type: 'MemberExpression',
+      object: this.visit(ctx._expr),
+      property: literal,
+      computed: false,
+      optional: false
     }
   }
 
