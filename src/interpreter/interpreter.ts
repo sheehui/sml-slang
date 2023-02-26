@@ -108,14 +108,14 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ArrayExpression: function* (node: es.ArrayExpression, context: Context) {
-    return node.leadingComments?.values[0] === "list" 
+    return node.leadingComments![0].value === "list" 
         ? {
-          tag: 'list',
-          elems: node.elements
+          tag: 'list_lit',
+          elems: node.elements.map(x => evaluators[x!.type]).reverse()
         }
         : {
-          tag: 'tuple',
-          elems: node.elements
+          tag: 'tuple_lit',
+          elems: node.elements.map(x => evaluators[x!.type]).reverse()
         }
   },
 
@@ -345,11 +345,11 @@ const microcode : { [tag: string]: Function } = {
   lam: (cmd: { params: any[], body: es.BlockStatement }) => {
     S.push({ tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: E})
   },
-  list: (cmd: {elems: any[]}) => {
-    
+  list_lit: (cmd: {elems: any[]}) => {
+    S.push(cmd.elems)
   },
-  tuple: (cmd: {elems: any[]}) => {
-    
+  tuple_lit: (cmd: {elems: any[]}) => {
+    S.push(cmd.elems)
   },
   binop_i: (cmd: { sym: es.BinaryOperator }) => {
     const right = S.pop() 
