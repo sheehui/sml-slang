@@ -1,4 +1,4 @@
-grammar Calc;
+grammar SmlSlang;
 
 /*
  * Tokens (terminal)

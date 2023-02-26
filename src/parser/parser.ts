@@ -6,11 +6,10 @@ import { RuleNode } from 'antlr4ts/tree/RuleNode'
 import { TerminalNode } from 'antlr4ts/tree/TerminalNode'
 import * as es from 'estree'
 
-import { CalcLexer } from '../lang/CalcLexer'
+import { SmlSlangLexer } from '../lang/SmlSlangLexer'
 import {
   AdditionContext,
   BooleanContext,
-  CalcParser,
   ConditionalContext,
   DeclarationContext,
   DivisionContext,
@@ -35,14 +34,15 @@ import {
   PowerContext,
   SeqDeclContext,
   SeqExprContext,
+  SmlSlangParser,
   StartContext,
   StmtContext,
   SubtractionContext,
   TupleAccessContext,
   TupleContext,
   VarDecContext
-} from '../lang/CalcParser'
-import { CalcVisitor } from '../lang/CalcVisitor'
+} from '../lang/SmlSlangParser'
+import { SmlSlangVisitor } from '../lang/SmlSlangVisitor'
 import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
 import { stripIndent } from '../utils/formatters'
 
@@ -143,7 +143,7 @@ function contextToLocation(ctx: ExpressionContext): es.SourceLocation {
     }
   }
 }
-class ExpressionGenerator implements CalcVisitor<es.Expression> {
+class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   visitNumber(ctx: NumberContext): es.Expression {
     return {
       type: 'Literal',
@@ -160,9 +160,9 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
-  visitIdentifier(ctx: IdentifierContext) : es.Expression {
+  visitIdentifier(ctx: IdentifierContext): es.Expression {
     return {
-      type: 'Identifier', 
+      type: 'Identifier',
       name: ctx.text
     }
   }
@@ -317,7 +317,7 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{type: "Line", value: "list"}]
+      leadingComments: [{ type: 'Line', value: 'list' }]
     }
   }
 
@@ -326,12 +326,12 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{type: "Line", value: "tuple"}]
+      leadingComments: [{ type: 'Line', value: 'tuple' }]
     }
   }
 
   visitTupleAccess(ctx: TupleAccessContext): es.Expression {
-    const literal : es.Expression =  {
+    const literal: es.Expression = {
       type: 'Literal',
       value: parseInt(ctx._record.text!.substring(1)),
       raw: ctx._record.text,
@@ -346,17 +346,17 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
     }
   }
 
-  visitLocalDec(ctx: LocalDecContext) : es.Expression {
+  visitLocalDec(ctx: LocalDecContext): es.Expression {
     const expressions = this.visitSeqExpr(ctx._expr)
-    expressions["locals"] = {
+    expressions['locals'] = {
       type: 'VariableDeclaration',
       declarations: new DeclarationGenerator().visitSeqDec(ctx._decl),
       kind: 'const'
-    } 
+    }
     return expressions
   }
 
-  visitSeqExpr(ctx: SeqExprContext) : es.Expression {
+  visitSeqExpr(ctx: SeqExprContext): es.Expression {
     const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
     return {
       type: 'SequenceExpression',
@@ -401,50 +401,56 @@ class ExpressionGenerator implements CalcVisitor<es.Expression> {
   }
 }
 
-class DeclarationGenerator implements CalcVisitor<es.VariableDeclarator[]> {
-  visitVarDec(ctx: VarDecContext) : es.VariableDeclarator[] {
-    return [{
-        type: 'VariableDeclarator', 
+class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
+  visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
+    return [
+      {
+        type: 'VariableDeclarator',
         id: {
-          type: 'Identifier', 
+          type: 'Identifier',
           name: ctx._identifier.text! // '!' is a non-null assertion operator
-        }, 
+        },
         init: new ExpressionGenerator().visit(ctx._value)
-      }]
+      }
+    ]
   }
-  visitFunDec(ctx: FunDecContext) : es.VariableDeclarator[] {
+  visitFunDec(ctx: FunDecContext): es.VariableDeclarator[] {
     const identifier = {
-      type: 'Identifier', 
+      type: 'Identifier',
       name: ctx._identifier.text!
     } as es.Identifier
 
-    return [{
-      type: 'VariableDeclarator',
-      id: identifier,
-      init: {
-        type: 'FunctionExpression', 
+    return [
+      {
+        type: 'VariableDeclarator',
         id: identifier,
-        params: [new PatternGenerator().visitPattern(ctx.pattern())],
-        body: {
-          type: 'BlockStatement', 
-          body: [{
-            type: 'ExpressionStatement',
-            expression: new ExpressionGenerator().visit(ctx.expression())
-          }]
-        } 
+        init: {
+          type: 'FunctionExpression',
+          id: identifier,
+          params: [new PatternGenerator().visitPattern(ctx.pattern())],
+          body: {
+            type: 'BlockStatement',
+            body: [
+              {
+                type: 'ExpressionStatement',
+                expression: new ExpressionGenerator().visit(ctx.expression())
+              }
+            ]
+          }
+        }
       }
-    }]
+    ]
   }
-  visitSeqDec(ctx: SeqDeclContext) : es.VariableDeclarator[] {
+  visitSeqDec(ctx: SeqDeclContext): es.VariableDeclarator[] {
     const ctxs = ctx.declaration()
-    let declarations : es.VariableDeclarator[] = [] 
+    let declarations: es.VariableDeclarator[] = []
     for (let i = 0; i < ctxs.length; i++) {
-      declarations = declarations.concat(ctxs[i].accept(this)); 
+      declarations = declarations.concat(ctxs[i].accept(this))
     }
-    return declarations 
+    return declarations
   }
 
-  visitDeclaration(ctx: DeclarationContext) : es.VariableDeclarator[] {
+  visitDeclaration(ctx: DeclarationContext): es.VariableDeclarator[] {
     return this.visitVarDec(ctx as VarDecContext)
   }
 
@@ -481,13 +487,13 @@ class DeclarationGenerator implements CalcVisitor<es.VariableDeclarator[]> {
   }
 }
 
-class StmtGenerator implements CalcVisitor<es.Statement> {
-  visitStmt(ctx: StmtContext) : es.Statement {
+class StmtGenerator implements SmlSlangVisitor<es.Statement> {
+  visitStmt(ctx: StmtContext): es.Statement {
     if (ctx.seqExpr()) {
       const generator = new ExpressionGenerator()
       return {
-        type: "ExpressionStatement", 
-        expression: generator.visitSeqExpr(ctx.seqExpr()!), 
+        type: 'ExpressionStatement',
+        expression: generator.visitSeqExpr(ctx.seqExpr()!)
       } as es.ExpressionStatement
     } else {
       const generator = new DeclarationGenerator()
@@ -500,7 +506,7 @@ class StmtGenerator implements CalcVisitor<es.Statement> {
     }
   }
 
-  visit(tree: ParseTree):es.Statement {
+  visit(tree: ParseTree): es.Statement {
     return tree.accept(this)
   }
 
@@ -529,28 +535,28 @@ class StmtGenerator implements CalcVisitor<es.Statement> {
   }
 }
 
-class PatternGenerator implements CalcVisitor<es.Pattern> {
-  visitPattern(ctx: PatternContext) : es.Pattern {
+class PatternGenerator implements SmlSlangVisitor<es.Pattern> {
+  visitPattern(ctx: PatternContext): es.Pattern {
     if (ctx.ID()) {
       return {
-        type: 'Identifier', 
+        type: 'Identifier',
         name: ctx.ID()?.text!
       }
     } else if (ctx.WILDC()) {
       return {
-        type: 'Identifier', 
+        type: 'Identifier',
         name: '_'
       }
     } else {
-      // number or boolean 
+      // number or boolean
       return {
-        type: 'Identifier', 
+        type: 'Identifier',
         name: '_'
       }
     }
   }
 
-  visit(tree: ParseTree):es.Pattern {
+  visit(tree: ParseTree): es.Pattern {
     return tree.accept(this)
   }
 
@@ -584,12 +590,14 @@ function convertSource(start: StartContext): es.Program {
   return {
     type: 'Program',
     sourceType: 'script',
-    body: [{
-      type: "BlockStatement",
-      body: start.stmt().map(ctx => {
-        return ctx.accept(generator)
-      })
-    }]
+    body: [
+      {
+        type: 'BlockStatement',
+        body: start.stmt().map(ctx => {
+          return ctx.accept(generator)
+        })
+      }
+    ]
   }
 }
 
@@ -598,9 +606,9 @@ export function parse(source: string, context: Context) {
 
   if (context.variant === 'calc') {
     const inputStream = CharStreams.fromString(source)
-    const lexer = new CalcLexer(inputStream)
+    const lexer = new SmlSlangLexer(inputStream)
     const tokenStream = new CommonTokenStream(lexer)
-    const parser = new CalcParser(tokenStream)
+    const parser = new SmlSlangParser(tokenStream)
     parser.buildParseTree = true
     try {
       const tree = parser.start()
