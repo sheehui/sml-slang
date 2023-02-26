@@ -9,6 +9,7 @@ import * as es from 'estree'
 import { SmlSlangLexer } from '../lang/SmlSlangLexer'
 import {
   AdditionContext,
+  AppendContext,
   BooleanContext,
   ConditionalContext,
   DeclarationContext,
@@ -23,6 +24,7 @@ import {
   LessThanOrEqualContext,
   ListContext,
   LocalDecContext,
+  MergeContext,
   ModuloContext,
   MultiplicationContext,
   NegationContext,
@@ -240,6 +242,28 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
+    }
+  }
+
+  visitAppend(ctx: AppendContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '|',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx),
+      leadingComments: [{type: "Line", value: 'list_append'}]
+    }
+  }
+
+  visitMerge(ctx: MergeContext): es.Expression {
+    return {
+      type: 'BinaryExpression',
+      operator: '|',
+      left: this.visit(ctx._left),
+      right: this.visit(ctx._right),
+      loc: contextToLocation(ctx),
+      leadingComments: [{type: "Line", value: 'list_merge'}]
     }
   }
 

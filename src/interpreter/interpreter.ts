@@ -1,6 +1,5 @@
 /* tslint:disable:max-classes-per-file */
 import * as es from 'estree'
-import { Statement } from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
@@ -156,11 +155,21 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
+
+    if (node.operator === '|') { // List binary expressions
+      const tag = node.leadingComments![0].value
+      return {
+        tag: tag,
+        frst,
+        scnd
+      }
+    }
+
     return {
       tag: 'binop',
       sym: node.operator,
-      frst: frst,
-      scnd: scnd
+      frst,
+      scnd
     }
   },
 
@@ -324,7 +333,7 @@ const microcode : { [tag: string]: Function } = {
       env = env.tail 
     }
     console.log("error: cannot find variable in env") 
-  }, 
+  },
   binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any }) => {
     A.push({
       tag: 'binop_i', 
@@ -360,6 +369,20 @@ const microcode : { [tag: string]: Function } = {
     cmd.elems.forEach(x => {
       A.push(x)
     })
+  },
+  list_merge: (cmd: { scnd: any; frst: any }) => {
+    A.push({
+      tag: 'list_merge_i', 
+    })
+    A.push(cmd.frst)
+    A.push(cmd.scnd)
+  },
+  list_append: (cmd: { scnd: any; frst: any }) => {
+    A.push({
+      tag: 'list_append_i', 
+    })
+    A.push(cmd.frst)
+    A.push(cmd.scnd)
   },
   tuple_lit: (cmd: {elems: any[]}) => {
     A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
@@ -400,6 +423,22 @@ const microcode : { [tag: string]: Function } = {
       list.push(S.pop())
     }
     S.push(list)
+  },
+  list_merge_i: () => {
+    const scnd = S.pop()
+    const frst = S.pop()
+
+    //TODO: check both is list
+    scnd.forEach((x: any) => frst.push(x))
+
+    S.push(frst)
+  },
+  list_append_i: () => {
+    const scnd = S.pop()
+    const frst = S.pop()
+
+    //TODO: check all are same type
+    S.push([frst, scnd])
   },
   tuple_lit_i: (cmd: { len: number }) => {
     const list = []

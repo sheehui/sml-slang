@@ -6,6 +6,8 @@ grammar SmlSlang;
 POW: '^';
 MUL: '*';
 HASH: '#';
+APPEND: '::';
+MERGE: '@';
 DIV: 'div';
 ADD: '+';
 SUB: '-';
@@ -69,11 +71,13 @@ expression
    | left=expression operator=ADD right=expression  # Addition
    | left=expression operator=SUB right=expression  # Subtraction
    | left=expression operator=MOD right=expression  # Modulo
+   | left=expression operator=APPEND right=expression # Append
+   | left=expression operator=MERGE right=expression  # Merge
    
    | left=expression operator=GT right=expression      # GreaterThan
-   | left=expression operator=GTE right=expression      # GreaterThanOrEqual
+   | left=expression operator=GTE right=expression     # GreaterThanOrEqual
    | left=expression operator=LT right=expression      # LessThan 
-   | left=expression operator=LTE right=expression      # LessThanOrEqual 
+   | left=expression operator=LTE right=expression     # LessThanOrEqual 
    | left=expression operator=EQUAL right=expression   # Equal
    | left=expression operator=NEQUAL right=expression  # Nequal
 
