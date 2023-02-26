@@ -108,13 +108,17 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   ArrayExpression: function* (node: es.ArrayExpression, context: Context) {
     const elems = []
+    const tag = node.leadingComments![0].value
+
     for (let i = 0; i < node.elements.length; i++) {
       const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
       elems.push(elem)
     }
-    return node.leadingComments![0].value === "list" 
-        ? { tag: 'list_lit', elems }
-        : { tag: 'tuple_lit', elems }
+    console.log(elems)
+    return {
+      tag, 
+      elems
+    }
   },
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
@@ -155,15 +159,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
-
-    if (node.operator === '|') { // List binary expressions
-      const tag = node.leadingComments![0].value
-      return {
-        tag: tag,
-        frst,
-        scnd
-      }
-    }
 
     return {
       tag: 'binop',
@@ -364,25 +359,23 @@ const microcode : { [tag: string]: Function } = {
   lam: (cmd: { params: any[], body: es.BlockStatement }) => {
     S.push({ tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: E})
   },
-  list_lit: (cmd: {elems: any[]}) => {
+  list_lit: (cmd: { elems: any[] }) => {
     A.push({ tag: 'list_lit_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
       A.push(x)
     })
   },
-  list_merge: (cmd: { scnd: any; frst: any }) => {
-    A.push({
-      tag: 'list_merge_i', 
+  list_merge: (cmd: { elems: any[] }) => {
+    A.push({ tag: 'list_merge_i', len: cmd.elems.length })
+    cmd.elems.forEach(x => {
+      A.push(x)
     })
-    A.push(cmd.frst)
-    A.push(cmd.scnd)
   },
-  list_append: (cmd: { scnd: any; frst: any }) => {
-    A.push({
-      tag: 'list_append_i', 
+  list_append: (cmd: {elems: any[]}) => {
+    A.push({ tag: 'list_append_i', len: cmd.elems.length })
+    cmd.elems.forEach(x => {
+      A.push(x)
     })
-    A.push(cmd.frst)
-    A.push(cmd.scnd)
   },
   tuple_lit: (cmd: {elems: any[]}) => {
     A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
@@ -424,21 +417,25 @@ const microcode : { [tag: string]: Function } = {
     }
     S.push(list)
   },
-  list_merge_i: () => {
-    const scnd = S.pop()
-    const frst = S.pop()
+  list_merge_i: (cmd: { len: number }) => {
+    const list = []
 
-    //TODO: check both is list
-    scnd.forEach((x: any) => frst.push(x))
-
-    S.push(frst)
+    //TODO: check both is list + same type1::
+    for (let i = 0; i < cmd.len; i++) {
+      list.push(...S.pop())
+    }
+    
+    S.push(list)
   },
-  list_append_i: () => {
-    const scnd = S.pop()
-    const frst = S.pop()
+  list_append_i: (cmd: { len: number }) => {
+    const list = []
 
     //TODO: check all are same type
-    S.push([frst, scnd])
+    for (let i = 0; i < cmd.len; i++) {
+      list.push(S.pop())
+    }
+    
+    S.push(list)
   },
   tuple_lit_i: (cmd: { len: number }) => {
     const list = []

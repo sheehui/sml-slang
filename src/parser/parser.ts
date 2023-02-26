@@ -246,23 +246,19 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   }
 
   visitAppend(ctx: AppendContext): es.Expression {
+    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
     return {
-      type: 'BinaryExpression',
-      operator: '|',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx),
+      type: 'ArrayExpression',
+      elements: expressions,
       leadingComments: [{type: "Line", value: 'list_append'}]
     }
   }
 
   visitMerge(ctx: MergeContext): es.Expression {
+    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
     return {
-      type: 'BinaryExpression',
-      operator: '|',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx),
+      type: 'ArrayExpression',
+      elements: expressions,
       leadingComments: [{type: "Line", value: 'list_merge'}]
     }
   }
@@ -341,7 +337,7 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{ type: 'Line', value: 'list' }]
+      leadingComments: [{ type: 'Line', value: 'list_lit' }]
     }
   }
 
@@ -350,7 +346,7 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{ type: 'Line', value: 'tuple' }]
+      leadingComments: [{ type: 'Line', value: 'tuple_lit' }]
     }
   }
 

@@ -65,14 +65,15 @@ expression
 
    | '(' inner=expression ')'                       # Parentheses
    | '(' ( expression ( ',' expression )* )? ')'    # Tuple
+   | expression (APPEND expression)+                # Append
+   | expression (MERGE expression)+                 # Merge
+
    | left=expression operator=POW right=expression  # Power
    | left=expression operator=MUL right=expression  # Multiplication
    | left=expression operator=DIV right=expression  # Division
    | left=expression operator=ADD right=expression  # Addition
    | left=expression operator=SUB right=expression  # Subtraction
    | left=expression operator=MOD right=expression  # Modulo
-   | left=expression operator=APPEND right=expression # Append
-   | left=expression operator=MERGE right=expression  # Merge
    
    | left=expression operator=GT right=expression      # GreaterThan
    | left=expression operator=GTE right=expression     # GreaterThanOrEqual
