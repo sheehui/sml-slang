@@ -58,7 +58,7 @@ expression
    | NIL                                            # Nil
 
    | ID                                             # Identifier
-   | '"' ID '"'                              # String
+   | '"' ID '"'                                     # String
 
    | '[' ( expression ( ',' expression )* )? ']'    # List
    | record=TUPLE_ACCESS expr=expression            # TupleAccess

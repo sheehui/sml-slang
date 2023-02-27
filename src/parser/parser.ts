@@ -149,11 +149,9 @@ function contextToLocation(ctx: ExpressionContext): es.SourceLocation {
 }
 
 function help(expressions: es.Expression[], str: string) : es.Expression[] {
-  console.log(expressions)
   const arr : es.Expression[] = [] 
   for (let i = 0; i < expressions.length; i++) {
     const curr : es.Expression = expressions[i] 
-    console.log(curr, 'curr')
     if (curr.leadingComments && curr.leadingComments![0].value === str) {
       arr.push(...(curr as any).elements) 
     } else {
