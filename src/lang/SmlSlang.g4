@@ -39,6 +39,7 @@ WILDC: '_';
 NIL: 'nil'; 
 NUMBER: DIGIT+;
 TUPLE_ACCESS: HASH [1-9] DIGIT*;
+STRING: '"' (~["])+ '"';
 ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
 WHITESPACE: [ \r\n\t]+ -> skip;
 
@@ -55,12 +56,11 @@ stmt
    ; 
 
 expression
-   : NUMBER                                         # Number
+   : ID                                             # Identifier
+   | STRING                                         # String
+   | NUMBER                                         # Number
    | BOOLEAN                                        # Boolean
    | NIL                                            # Nil
-
-   | ID                                             # Identifier
-   | '"' ID '"'                                     # String
 
    | '(' inner=expression ')'                       # Parentheses
    | '(' ( expression ( ',' expression )* )? ')'    # Tuple
