@@ -114,7 +114,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
       elems.push(elem)
     }
-    console.log(elems)
+
     return {
       tag, 
       elems
@@ -432,7 +432,9 @@ const microcode : { [tag: string]: Function } = {
 
     //TODO: check all are same type
     for (let i = 0; i < cmd.len; i++) {
-      list.push(S.pop())
+      const elem = S.pop()
+      // TODO: peek terminal node == null, unwrap second last node accordingly
+      list.push(elem)
     }
     
     S.push(list)
