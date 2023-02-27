@@ -62,6 +62,15 @@ export const checkBinaryExpression = (
   right: Value
 ) => {
   switch (operator) {
+    case '^':
+      if (!isString(left)) {
+        return new TypeError(node, LHS, 'string', typeOf(left))
+      } else if (!isString(right)) {
+        return new TypeError(node, RHS, 'string', typeOf(right))
+      } else {
+        return
+      }
+    case '+':
     case '-':
     case '*':
     case '/':
@@ -73,7 +82,6 @@ export const checkBinaryExpression = (
       } else {
         return
       }
-    case '+':
     case '<':
     case '<=':
     case '>':

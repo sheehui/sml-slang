@@ -5,7 +5,7 @@ import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, Value } from '../types'
 import { Stack } from '../types'
-import { evaluateBinaryExpression, evaluateUnaryExpression } from '../utils/operators'
+import { binaryOp, unaryOp } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 
 const step_limit = 1000000
@@ -152,7 +152,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return {
       tag: 'unop',
       sym: node.operator, 
-      arg: yield* evaluators[node.argument.type](node.argument, context)
+      arg: yield* evaluators[node.argument.type](node.argument, context),
+      loc: node.loc
     }
   },
 
@@ -164,7 +165,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       tag: 'binop',
       sym: node.operator,
       frst,
-      scnd
+      scnd,
+      loc: node.loc
     }
   },
 
@@ -328,18 +330,20 @@ const microcode : { [tag: string]: Function } = {
     }
     console.log("error: cannot find variable in env") 
   },
-  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any }) => {
+  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; loc: es.SourceLocation }) => {
     A.push({
       tag: 'binop_i', 
-      sym: cmd.sym
+      sym: cmd.sym,
+      loc: cmd.loc
     })
     A.push(cmd.frst)
     A.push(cmd.scnd)
   }, 
-  unop: (cmd: { sym: es.BinaryOperator; arg: any }) => {
+  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation }) => {
     A.push({
       tag: 'unop_i',
-      sym: cmd.sym
+      sym: cmd.sym,
+      loc: cmd.loc
     })
     A.push(cmd.arg)
   }, 
@@ -394,14 +398,16 @@ const microcode : { [tag: string]: Function } = {
       A.push({tag: 'id', sym: cmd.expr.name})
     }
   },
-  binop_i: (cmd: { sym: es.BinaryOperator }) => {
+  binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
     const right = S.pop() 
-    const left = S.pop() 
-    S.push(evaluateBinaryExpression(cmd.sym, left, right))
+    const left = S.pop()
+    S.push(binaryOp(cmd.sym, left, right, cmd.loc))
+    // S.push(evaluateBinaryExpression(cmd.sym, left, right))
   },
-  unop_i: (cmd: { sym: es.UnaryOperator }) => {
+  unop_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
     const arg = S.pop()
-    S.push(evaluateUnaryExpression(cmd.sym, arg))
+    S.push(unaryOp(cmd.sym, arg, cmd.loc))
+    // S.push(evaluateUnaryExpression(cmd.sym, arg))
   },
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env 
@@ -471,9 +477,11 @@ export function* evaluate(node: es.Node, context: Context) : any{
     console.log("\n=====instruction====")
     console.log(cmd)
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
-      console.log("stash:")
+      console.log("before stash:")
       S.print() // print stash
       microcode[cmd.tag](cmd)
+      console.log("after stash:")
+      S.print() // print stash
     } else {
       console.log("error")
     }

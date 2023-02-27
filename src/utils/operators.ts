@@ -1,4 +1,4 @@
-import { BinaryOperator, UnaryOperator } from 'estree'
+import { BinaryOperator, SourceLocation,UnaryOperator } from 'estree'
 
 import { LazyBuiltIn } from '../createContext'
 import {
@@ -125,8 +125,10 @@ export function boolOrErr(candidate: any, line: number, column: number) {
   }
 }
 
-export function unaryOp(operator: UnaryOperator, argument: any, line: number, column: number) {
+export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocation) {
   argument = forceIt(argument)
+  const line = loc.start.line;
+  const column = loc.start.column
   const error = rttc.checkUnaryExpression(
     create.locationDummyNode(line, column),
     operator,
@@ -155,11 +157,12 @@ export function binaryOp(
   operator: BinaryOperator,
   left: any,
   right: any,
-  line: number,
-  column: number
+  loc: SourceLocation
 ) {
   left = forceIt(left)
   right = forceIt(right)
+  const line = loc.start.line
+  const column = loc.start.column
   const error = rttc.checkBinaryExpression(
     create.locationDummyNode(line, column),
     operator,
@@ -173,46 +176,34 @@ export function binaryOp(
   }
 }
 
-function isString(value: any) {
-  return typeof value === 'string'
-}
-
-function isInteger(value: any) {
-  return typeof value == 'number'
-}
-
-function canCompare(left: any, right: any) {
-  return (isString(left) && isString(right))|| (isInteger(left) && isInteger(right))
-}
-
 export function evaluateBinaryExpression(operator: BinaryOperator, left: any, right: any) {
   switch (operator) {
     case '+':
-      return isInteger(left) && isInteger(right) ? left + right : Error("+ requires two numbers")
+      return left + right
     case '-':
-      return isInteger(left) && isInteger(right) ? left - right : Error("- requires two numbers")
+      return left - right
     case '*':
-      return isInteger(left) && isInteger(right) ? left * right : Error("* requires two numbers")
+      return left * right
     case '/':
-      return isInteger(left) && isInteger(right) ? left / right : Error("+/requires two numbers")
+      return left / right
     case '%':
-      return isInteger(left) && isInteger(right) ? left % right : Error("% requires two numbers")
+      return left % right
     case '===':
       return left === right
     case '!==':
       return left !== right
     case '<=':
-      return canCompare(left, right) ? left <= right : Error(left + " and " + right + " cannot be compared")
+      return left <= right
     case '<':
-      return canCompare(left, right) ? left < right : Error(left + " and " + right + " cannot be compared")
+      return left < right
     case '>':
-      return canCompare(left, right)  ? left > right : Error(left + " and " + right + " cannot be compared")
+      return left > right
     case '>=':
-      return canCompare(left, right)  ? left >= right : Error(left + " and " + right + " cannot be compared")
+      return left >= right
     case '^':
-      return isString(left) && isString(right) ? left + right : Error("^ requires two strings")
+      return left ^ right
     default:
-      return Error("Invalid binary operator" + operator)
+      return Error("Invalid binary operator " + operator)
   }
 }
 

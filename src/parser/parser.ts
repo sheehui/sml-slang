@@ -205,7 +205,8 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
       type: 'UnaryExpression',
       operator: '~',
       prefix: true,
-      argument: this.visit(ctx._right)
+      argument: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
     }
   }
   visitNegation(ctx: NegationContext): es.Expression {
@@ -213,7 +214,8 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
       type: 'UnaryExpression',
       operator: '-',
       prefix: true,
-      argument: this.visit(ctx._right)
+      argument: this.visit(ctx._right),
+      loc: contextToLocation(ctx)
     }
   }
   visitParentheses(ctx: ParenthesesContext): es.Expression {

@@ -31,7 +31,9 @@ VAL: 'val';
 LET: 'let'; 
 IN: 'in'; 
 END: 'end'; 
-FUN: 'fun'; 
+FUN: 'fun';
+WHILE: 'while';
+DO: 'do';
 SEMIC: ';'; 
 WILDC: '_'; 
 NIL: 'nil'; 
@@ -86,7 +88,7 @@ expression
    | left=expression operator=NEQUAL right=expression  # Nequal
 
    | IF pred=expression THEN cons=expression ELSE alt=expression  # Conditional
-   | LET decl=seqDecl IN expr=seqExpr END    # LocalDec
+   | LET decl=seqDecl IN expr=seqExpr END                         # LocalDec
    ;
 
 seqExpr
