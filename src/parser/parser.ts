@@ -40,6 +40,7 @@ import {
   SmlSlangParser,
   StartContext,
   StmtContext,
+  StringContext,
   SubtractionContext,
   TupleAccessContext,
   TupleContext,
@@ -191,6 +192,14 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return {
       type: 'Identifier',
       name: ctx.text
+    }
+  }
+  visitString(ctx: StringContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: ctx.text.substring(1, ctx.text.length - 1),
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
     }
   }
   visitNot(ctx: NotContext): es.Expression {

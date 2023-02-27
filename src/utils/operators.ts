@@ -173,32 +173,46 @@ export function binaryOp(
   }
 }
 
+function isString(value: any) {
+  return typeof value === 'string'
+}
+
+function isInteger(value: any) {
+  return typeof value == 'number'
+}
+
+function canCompare(left: any, right: any) {
+  return (isString(left) && isString(right))|| (isInteger(left) && isInteger(right))
+}
+
 export function evaluateBinaryExpression(operator: BinaryOperator, left: any, right: any) {
   switch (operator) {
     case '+':
-      return left + right
+      return isInteger(left) && isInteger(right) ? left + right : Error("+ requires two numbers")
     case '-':
-      return left - right
+      return isInteger(left) && isInteger(right) ? left - right : Error("- requires two numbers")
     case '*':
-      return left * right
+      return isInteger(left) && isInteger(right) ? left * right : Error("* requires two numbers")
     case '/':
-      return left / right
+      return isInteger(left) && isInteger(right) ? left / right : Error("+/requires two numbers")
     case '%':
-      return left % right
+      return isInteger(left) && isInteger(right) ? left % right : Error("% requires two numbers")
     case '===':
       return left === right
     case '!==':
       return left !== right
     case '<=':
-      return left <= right
+      return canCompare(left, right) ? left <= right : Error(left + " and " + right + " cannot be compared")
     case '<':
-      return left < right
+      return canCompare(left, right) ? left < right : Error(left + " and " + right + " cannot be compared")
     case '>':
-      return left > right
+      return canCompare(left, right)  ? left > right : Error(left + " and " + right + " cannot be compared")
     case '>=':
-      return left >= right
+      return canCompare(left, right)  ? left >= right : Error(left + " and " + right + " cannot be compared")
+    case '^':
+      return isString(left) && isString(right) ? left + right : Error("^ requires two strings")
     default:
-      return undefined
+      return Error("Invalid binary operator" + operator)
   }
 }
 

@@ -196,7 +196,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
-    console.log(node)
     // const decl = node.declarations[0]
     // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
     const ids = [] 
