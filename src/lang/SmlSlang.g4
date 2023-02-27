@@ -60,16 +60,16 @@ expression
    | ID                                             # Identifier
    | '"' ID '"'                                     # String
 
-   | '[' ( expression ( ',' expression )* )? ']'    # List
+   | '(' inner=expression ')'                       # Parentheses
+   | '(' ( expression ( ',' expression )* )? ')'    # Tuple
    | record=TUPLE_ACCESS expr=expression            # TupleAccess
+
+   | '[' ( expression ( ',' expression )* )? ']'    # List
+   | expression (APPEND expression)+                # Append
+   | expression (MERGE expression)+                 # Merge
 
    | operator=NEG right=expression                  # Negation
    | operator=NOT right=expression                  # Not
-
-   | '(' inner=expression ')'                       # Parentheses
-   | '(' ( expression ( ',' expression )* )? ')'    # Tuple
-   | expression (APPEND expression)+                # Append
-   | expression (MERGE expression)+                 # Merge
 
    | left=expression operator=POW right=expression  # Power
    | left=expression operator=MUL right=expression  # Multiplication
@@ -80,7 +80,7 @@ expression
    
    | left=expression operator=GT right=expression      # GreaterThan
    | left=expression operator=GTE right=expression     # GreaterThanOrEqual
-   | left=expression operator=LT right=expression      # LessThan 
+   | left=expression operator=LT right=expression      # LessThan
    | left=expression operator=LTE right=expression     # LessThanOrEqual 
    | left=expression operator=EQUAL right=expression   # Equal
    | left=expression operator=NEQUAL right=expression  # Nequal

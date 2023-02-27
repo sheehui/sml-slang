@@ -411,6 +411,7 @@ const microcode : { [tag: string]: Function } = {
   },
   list_lit_i: (cmd: { len: number }) => {
     const list = []
+    // TODO: type checking
     for (let i = 0; i < cmd.len; i++) {
       list.push(S.pop())
     }
