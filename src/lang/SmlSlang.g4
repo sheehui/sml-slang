@@ -34,6 +34,7 @@ END: 'end';
 FUN: 'fun'; 
 SEMIC: ';'; 
 WILDC: '_'; 
+NIL: 'nil'; 
 NUMBER: DIGIT+;
 TUPLE_ACCESS: HASH [1-9] DIGIT*;
 ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
@@ -54,6 +55,7 @@ stmt
 expression
    : NUMBER                                         # Number
    | BOOLEAN                                        # Boolean
+   | NIL                                            # Nil
 
    | ID                                             # Identifier
 

@@ -29,6 +29,7 @@ import {
   MultiplicationContext,
   NegationContext,
   NequalContext,
+  NilContext,
   NotContext,
   NumberContext,
   ParenthesesContext,
@@ -145,6 +146,22 @@ function contextToLocation(ctx: ExpressionContext): es.SourceLocation {
     }
   }
 }
+
+function help(expressions: es.Expression[], str: string) : es.Expression[] {
+  console.log(expressions)
+  const arr : es.Expression[] = [] 
+  for (let i = 0; i < expressions.length; i++) {
+    const curr : es.Expression = expressions[i] 
+    console.log(curr, 'curr')
+    if (curr.leadingComments && curr.leadingComments![0].value === str) {
+      arr.push(...(curr as any).elements) 
+    } else {
+      arr.push(curr)
+    }
+  }
+  return arr
+}
+
 class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   visitNumber(ctx: NumberContext): es.Expression {
     return {
@@ -158,6 +175,14 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return {
       type: 'Literal',
       value: ctx.text === 'true',
+      raw: ctx.text,
+      loc: contextToLocation(ctx)
+    }
+  }
+  visitNil(ctx: NilContext): es.Expression {
+    return {
+      type: 'Literal',
+      value: null,
       raw: ctx.text,
       loc: contextToLocation(ctx)
     }
@@ -246,19 +271,19 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   }
 
   visitAppend(ctx: AppendContext): es.Expression {
-    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
+    // const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
     return {
       type: 'ArrayExpression',
-      elements: expressions,
+      elements: help(ctx.expression().map(exp => exp.accept(this)), 'list_append'),
       leadingComments: [{type: "Line", value: 'list_append'}]
     }
   }
 
   visitMerge(ctx: MergeContext): es.Expression {
-    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
+    // const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
     return {
       type: 'ArrayExpression',
-      elements: expressions,
+      elements: help(ctx.expression().map(exp => exp.accept(this)), 'list_merge'),
       leadingComments: [{type: "Line", value: 'list_merge'}]
     }
   }
