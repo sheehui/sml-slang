@@ -195,15 +195,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
-    const test = yield* actualValue(node.test, context)
-    const cons = yield* actualValue(node.consequent, context)
-    const alt = yield* actualValue(node.alternate, context)
-    const error = rttc.checkIfStatement(node, test)
-    if (error) {
-      return handleRuntimeError(context, error)
+    return {
+      tag: 'cond_expr', 
+      pred: yield* evaluators[node.test.type](node.test, context),
+      cons: yield* evaluators[node.consequent.type](node.consequent, context),
+      alt: yield* evaluators[node.alternate.type](node.alternate, context)
     }
-    
-    return test ? cons : alt
   },
 
   LogicalExpression: function* (node: es.LogicalExpression, context: Context) {
@@ -411,13 +408,17 @@ const microcode : { [tag: string]: Function } = {
       A.push({tag: 'id', sym: cmd.expr.name})
     }
   },
-  app: (cmd: { args: es.Expression[], fun: es.FunctionExpression | es.Identifier }) => {
+  app: (cmd: { args: any[], fun: any }) => {
     A.push({ tag: 'app_i', arity: cmd.args.length })
     for (let i = 0; i < cmd.args.length; i++) {
       A.push(cmd.args[i]) 
     }
     A.push(cmd.fun)
   },
+  cond_expr: (cmd: { pred: any, cons: any, alt: any }) => {
+    A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt })
+    A.push(cmd.pred)
+  }, 
   binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
     const right = S.pop() 
     const left = S.pop()
@@ -502,6 +503,10 @@ const microcode : { [tag: string]: Function } = {
       id: E.id,  
       name: 'program'
     }
+  },
+  branch_i: (cmd: { cons: any, alt: any }) => {
+    const pred = S.pop() 
+    A.push(pred ? cmd.cons : cmd.alt) 
   }
 }
 // tslint:enable:object-literal-shorthand
