@@ -199,7 +199,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       tag: 'cond_expr', 
       pred: yield* evaluators[node.test.type](node.test, context),
       cons: yield* evaluators[node.consequent.type](node.consequent, context),
-      alt: yield* evaluators[node.alternate.type](node.alternate, context)
+      alt: yield* evaluators[node.alternate.type](node.alternate, context),
+      node: node 
     }
   },
 
@@ -415,8 +416,8 @@ const microcode : { [tag: string]: Function } = {
     }
     A.push(cmd.fun)
   },
-  cond_expr: (cmd: { pred: any, cons: any, alt: any }) => {
-    A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt })
+  cond_expr: (cmd: { pred: any, cons: any, alt: any, node: es.ConditionalExpression }) => {
+    A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node })
     A.push(cmd.pred)
   }, 
   binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
@@ -489,6 +490,7 @@ const microcode : { [tag: string]: Function } = {
     }
     const func = S.pop() 
 
+    // TODO: Implement tail call 
     A.push({ tag: 'env_i', env: E }) 
 
     A.push(func.body)
@@ -504,8 +506,12 @@ const microcode : { [tag: string]: Function } = {
       name: 'program'
     }
   },
-  branch_i: (cmd: { cons: any, alt: any }) => {
+  branch_i: (cmd: { cons: any, alt: any, node: es.ConditionalExpression }) => {
     const pred = S.pop() 
+    const error = rttc.checkIfStatement(cmd.node, pred)
+    if (error) {
+      throw error
+    }
     A.push(pred ? cmd.cons : cmd.alt) 
   }
 }

@@ -368,7 +368,8 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
       type: 'ConditionalExpression',
       test: this.visit(ctx._pred),
       alternate: this.visit(ctx._alt),
-      consequent: this.visit(ctx._cons)
+      consequent: this.visit(ctx._cons),
+      loc: contextToLocation(ctx)
     }
   }
 
