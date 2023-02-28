@@ -142,12 +142,10 @@ export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocat
 }
 
 export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
-  if (operator === '!') {
+  if (operator === '~') {
     return !value
   } else if (operator === '-') {
     return -value
-  } else if (operator === 'typeof') {
-    return typeof value
   } else {
     return +value
   }
