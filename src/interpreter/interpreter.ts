@@ -122,9 +122,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
+    const params = [] 
+    for (let i = 0; i < node.params.length; i++) {
+      params.push(yield* evaluators[node.params[i].type](node.params[i], context))
+    }
     return {
       tag: 'lam', 
-      params: [yield* evaluators[node.params[0].type](node.params[0], context)],
+      params,
       body: yield* evaluators[node.body.type](node.body, context)
     }
   },

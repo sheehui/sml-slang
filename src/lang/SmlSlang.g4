@@ -105,8 +105,9 @@ declaration
    ;
 
 pattern
-   : WILDC
-   | ID 
-   | NUMBER 
-   | BOOLEAN 
+   : WILDC                                    # PattWildc
+   | ID                                       # PattId
+   | NUMBER                                   # PattNum
+   | BOOLEAN                                  # PattBool
+   | '(' ( pattern ( ',' pattern )* )? ')'    # PattTuple
    ; 

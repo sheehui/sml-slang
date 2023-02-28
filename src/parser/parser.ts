@@ -33,7 +33,12 @@ import {
   NotContext,
   NumberContext,
   ParenthesesContext,
+  PattBoolContext,
   PatternContext,
+  PattIdContext,
+  PattNumContext,
+  PattTupleContext,
+  PattWildcContext,
   PowerContext,
   SeqDeclContext,
   SeqExprContext,
@@ -481,7 +486,7 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
         init: {
           type: 'FunctionExpression',
           id: identifier,
-          params: [new PatternGenerator().visitPattern(ctx.pattern())],
+          params: new PatternGenerator().visit(ctx.pattern()),
           body: {
             type: 'BlockStatement',
             body: [
@@ -589,40 +594,54 @@ class StmtGenerator implements SmlSlangVisitor<es.Statement> {
   }
 }
 
-class PatternGenerator implements SmlSlangVisitor<es.Pattern> {
-  visitPattern(ctx: PatternContext): es.Pattern {
-    if (ctx.ID()) {
-      return {
-        type: 'Identifier',
-        name: ctx.ID()?.text!
-      }
-    } else if (ctx.WILDC()) {
-      return {
-        type: 'Identifier',
-        name: '_'
-      }
-    } else {
-      // number or boolean
-      return {
-        type: 'Identifier',
-        name: '_'
-      }
-    }
+class PatternGenerator implements SmlSlangVisitor<es.Pattern[]> {
+  visitPattId(ctx: PattIdContext): es.Pattern[] {
+    return [{
+      type: 'Identifier',
+      name: ctx.ID()?.text!
+    }]
   }
 
-  visit(tree: ParseTree): es.Pattern {
+  visitPattWildc(ctx: PattWildcContext): es.Pattern[] {
+    return [{
+      type: 'Identifier',
+      name: '_'
+    }]
+  }
+
+  visitPattTuple(ctx: PattTupleContext) : es.Pattern[] {
+    const patterns = ctx.pattern() 
+    const elements = patterns.reduce((x, y) => x.concat(y.accept(this)), [] as es.Pattern[])
+    return elements
+  }
+
+  visitPattNum(ctx: PattNumContext) : es.Pattern[] {
+    return [{
+      type: 'Identifier',
+      name: '_'
+    }]
+  }
+
+  visitPattBool(ctx: PattBoolContext) : es.Pattern[] {
+    return [{
+      type: 'Identifier',
+      name: '_'
+    }]
+  }
+
+  visit(tree: ParseTree): es.Pattern[] {
     return tree.accept(this)
   }
 
-  visitChildren(node: RuleNode): es.Pattern {
+  visitChildren(node: RuleNode): es.Pattern[] {
     return node.accept(this)
   }
 
-  visitTerminal(node: TerminalNode): es.Pattern {
+  visitTerminal(node: TerminalNode): es.Pattern[] {
     return node.accept(this)
   }
 
-  visitErrorNode(node: ErrorNode): es.Pattern {
+  visitErrorNode(node: ErrorNode): es.Pattern[] {
     throw new FatalSyntaxError(
       {
         start: {
