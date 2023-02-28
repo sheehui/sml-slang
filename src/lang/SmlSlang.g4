@@ -62,6 +62,7 @@ expression
    | BOOLEAN                                        # Boolean
    | NIL                                            # Nil
 
+   | callee=ID '(' ( expression ( ',' expression )* )? ')' # FuncApp
    | '(' inner=expression ')'                       # Parentheses
    | '(' ( expression ( ',' expression )* )? ')'    # Tuple
    | record=TUPLE_ACCESS expr=expression            # TupleAccess

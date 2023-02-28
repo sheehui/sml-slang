@@ -145,7 +145,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   CallExpression: function* (node: es.CallExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
+    const args = [] 
+    for (let i = 0; i < node.arguments.length; i++) { 
+      const arg = node.arguments[i] 
+      args.push(yield* evaluators[arg.type](arg, context))
+    }
+    return {
+      tag: 'app', 
+      fun: yield* evaluators[node.callee.type](node.callee, context), 
+      args
+    }
   },
 
   NewExpression: function* (node: es.NewExpression, context: Context) {
@@ -402,6 +411,13 @@ const microcode : { [tag: string]: Function } = {
       A.push({tag: 'id', sym: cmd.expr.name})
     }
   },
+  app: (cmd: { args: es.Expression[], fun: es.FunctionExpression | es.Identifier }) => {
+    A.push({ tag: 'app_i', arity: cmd.args.length })
+    for (let i = 0; i < cmd.args.length; i++) {
+      A.push(cmd.args[i]) 
+    }
+    A.push(cmd.fun)
+  },
   binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
     const right = S.pop() 
     const left = S.pop()
@@ -464,6 +480,28 @@ const microcode : { [tag: string]: Function } = {
     }
 
     S.push(tuple[cmd.index])
+  },
+  app_i: (cmd: { arity: number }) => {
+    const args = []
+    for (let i = 0; i < cmd.arity; i++) {
+      args.push(S.pop())
+    }
+    const func = S.pop() 
+
+    A.push({ tag: 'env_i', env: E }) 
+
+    A.push(func.body)
+    // set E to the function env, extended with params and args 
+    const newFrame = {} 
+    for (let j = 0; j < cmd.arity; j++) {
+      newFrame[func.params[j]] = args[j]
+    }
+    E = {
+      head: newFrame, 
+      tail: func.env, 
+      id: E.id,  
+      name: 'program'
+    }
   }
 }
 // tslint:enable:object-literal-shorthand
@@ -480,6 +518,8 @@ export function* evaluate(node: es.Node, context: Context) : any{
     const cmd = A.pop()
     console.log("\n=====instruction====")
     console.log(cmd)
+    // console.log("\n=====agenda====")
+    // A.print() 
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
       console.log("before stash:")
       S.print() // print stash

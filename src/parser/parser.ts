@@ -16,6 +16,7 @@ import {
   DivisionContext,
   EqualContext,
   ExpressionContext,
+  FuncAppContext,
   FunDecContext,
   GreaterThanContext,
   GreaterThanOrEqualContext,
@@ -413,6 +414,23 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
       kind: 'const'
     }
     return expressions
+  }
+
+  visitFuncApp(ctx: FuncAppContext) : es.Expression {
+    const exprs = ctx.expression() 
+    const args = []
+    for (let i = 0; i < exprs.length; i++) {
+      args.push(exprs[i].accept(this))
+    }
+    return {
+      type: 'CallExpression', 
+      callee: {
+        type: 'Identifier',
+        name: ctx.ID().text
+      },
+      arguments: args,
+      optional: false // not sure what this does yet 
+    }
   }
 
   visitSeqExpr(ctx: SeqExprContext): es.Expression {
