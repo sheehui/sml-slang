@@ -105,7 +105,7 @@
       "\\.js$": "babel-jest"
     },
     "testEnvironment": "jsdom",
-    "testRegex": "/__tests__/.*\\.ts$",
+    "testRegex": "/tests/.*\\.ts$",
     "testPathIgnorePatterns": [
       "/dist/",
       ".*benchmark.*",
