@@ -14,3 +14,7 @@ coverage/
 .vscode/
 tsconfig.tsbuildinfo
 test-report.html
+
+!src/lang/
+src/lang/*
+!src/lang/*.g4

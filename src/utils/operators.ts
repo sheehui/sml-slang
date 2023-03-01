@@ -1,4 +1,4 @@
-import { BinaryOperator, UnaryOperator } from 'estree'
+import { BinaryOperator, SourceLocation,UnaryOperator } from 'estree'
 
 import { LazyBuiltIn } from '../createContext'
 import {
@@ -125,8 +125,10 @@ export function boolOrErr(candidate: any, line: number, column: number) {
   }
 }
 
-export function unaryOp(operator: UnaryOperator, argument: any, line: number, column: number) {
+export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocation) {
   argument = forceIt(argument)
+  const line = loc.start.line;
+  const column = loc.start.column
   const error = rttc.checkUnaryExpression(
     create.locationDummyNode(line, column),
     operator,
@@ -140,12 +142,10 @@ export function unaryOp(operator: UnaryOperator, argument: any, line: number, co
 }
 
 export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
-  if (operator === '!') {
+  if (operator === '~') {
     return !value
   } else if (operator === '-') {
     return -value
-  } else if (operator === 'typeof') {
-    return typeof value
   } else {
     return +value
   }
@@ -155,11 +155,12 @@ export function binaryOp(
   operator: BinaryOperator,
   left: any,
   right: any,
-  line: number,
-  column: number
+  loc: SourceLocation
 ) {
   left = forceIt(left)
   right = forceIt(right)
+  const line = loc.start.line
+  const column = loc.start.column
   const error = rttc.checkBinaryExpression(
     create.locationDummyNode(line, column),
     operator,
@@ -197,8 +198,10 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
       return left > right
     case '>=':
       return left >= right
+    case '^':
+      return left ^ right
     default:
-      return undefined
+      return Error("Invalid binary operator " + operator)
   }
 }
 

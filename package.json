@@ -39,7 +39,7 @@
     "sml-slang": "dist/repl/repl.js"
   },
   "scripts": {
-    "antlr4ts": "antlr4ts -visitor ./src/lang/Calc.g4",
+    "antlr4ts": "antlr4ts -visitor ./src/lang/SmlSlang.g4",
     "autocomplete": "node ./scripts/updateAutocompleteDocs.js",
     "benchmark": "jest --runInBand --testPathPattern='.*benchmark.*' --testPathIgnorePatterns='/dist/'",
     "build": "yarn docs && yarn tsc --build --force",
@@ -54,6 +54,7 @@
     "prepublishOnly": "tsc",
     "prepare": "husky install",
     "publish_sicp_package": "./scripts/publish_sicp_package.sh",
+    "repl": "yarn docs && yarn tsc --build --force && node dist/repl/repl.js", 
     "test": "jest",
     "test-coverage": "jest --coverage"
   },
@@ -104,7 +105,7 @@
       "\\.js$": "babel-jest"
     },
     "testEnvironment": "jsdom",
-    "testRegex": "/__tests__/.*\\.ts$",
+    "testRegex": "/tests/.*\\.ts$",
     "testPathIgnorePatterns": [
       "/dist/",
       ".*benchmark.*",

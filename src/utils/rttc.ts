@@ -46,9 +46,9 @@ const isObject = (v: Value) => typeOf(v) === 'object'
 const isArray = (v: Value) => typeOf(v) === 'array'
 
 export const checkUnaryExpression = (node: es.Node, operator: es.UnaryOperator, value: Value) => {
-  if ((operator === '+' || operator === '-') && !isNumber(value)) {
+  if (operator === '-' && !isNumber(value)) {
     return new TypeError(node, '', 'number', typeOf(value))
-  } else if (operator === '!' && !isBool(value)) {
+  } else if (operator === '~' && !isBool(value)) {
     return new TypeError(node, '', 'boolean', typeOf(value))
   } else {
     return undefined
@@ -62,6 +62,15 @@ export const checkBinaryExpression = (
   right: Value
 ) => {
   switch (operator) {
+    case '^':
+      if (!isString(left)) {
+        return new TypeError(node, LHS, 'string', typeOf(left))
+      } else if (!isString(right)) {
+        return new TypeError(node, RHS, 'string', typeOf(right))
+      } else {
+        return
+      }
+    case '+':
     case '-':
     case '*':
     case '/':
@@ -73,7 +82,6 @@ export const checkBinaryExpression = (
       } else {
         return
       }
-    case '+':
     case '<':
     case '<=':
     case '>':
