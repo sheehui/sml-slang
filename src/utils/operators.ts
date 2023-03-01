@@ -177,13 +177,14 @@ export function binaryOp(
 export function evaluateBinaryExpression(operator: BinaryOperator, left: any, right: any) {
   switch (operator) {
     case '+':
+    case '^':
       return left + right
     case '-':
       return left - right
     case '*':
       return left * right
     case '/':
-      return left / right
+      return Math.floor(left / right)
     case '%':
       return left % right
     case '===':
@@ -198,8 +199,6 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
       return left > right
     case '>=':
       return left >= right
-    case '^':
-      return left ^ right
     default:
       return Error("Invalid binary operator " + operator)
   }
