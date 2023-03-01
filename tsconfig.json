@@ -32,7 +32,8 @@
     "node_modules",
     "dist",
     "sicp_publish",
-    "repl_source.ts"
+    "repl_source.ts",
+    "tests"
   ],
   "types": [
     "typePatches",
