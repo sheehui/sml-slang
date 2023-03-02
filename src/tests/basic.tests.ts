@@ -229,4 +229,52 @@ describe('binop', () => {
       })
     })
   })
+
+  describe('greater than or equal', () => {
+    test('compare numbers', () => {
+      const code: string = '234 >= 234;'
+      runInContext(code, context, options).then(data => {
+        expect((data as Finished).value).toBe(true)
+      })
+    })
+
+    test('compare strings', () => {
+      const code: string = '"abcd" >= "aacd";'
+      runInContext(code, context, options).then(data => {
+        expect((data as Finished).value).toBe(true)
+      })
+    })
+  })
+
+  describe('smaller than', () => {
+    test('compare numbers', () => {
+      const code: string = '233 < 234;'
+      runInContext(code, context, options).then(data => {
+        expect((data as Finished).value).toBe(true)
+      })
+    })
+
+    test('compare strings', () => {
+      const code: string = '"abcd" < "aacd";'
+      runInContext(code, context, options).then(data => {
+        expect((data as Finished).value).toBe(false)
+      })
+    })
+  })
+
+  describe('smaller than or equal', () => {
+    test('compare numbers', () => {
+      const code: string = '233 <= 234;'
+      runInContext(code, context, options).then(data => {
+        expect((data as Finished).value).toBe(true)
+      })
+    })
+
+    test('compare strings', () => {
+      const code: string = '"abcd" <= "aacd";'
+      runInContext(code, context, options).then(data => {
+        expect((data as Finished).value).toBe(true)
+      })
+    })
+  })
 })
