@@ -86,8 +86,6 @@ export const checkBinaryExpression = (
     case '<=':
     case '>':
     case '>=':
-    case '!==':
-    case '===':
       if (isNumber(left)) {
         return isNumber(right) ? undefined : new TypeError(node, RHS, 'number', typeOf(right))
       } else if (isString(left)) {
@@ -95,6 +93,9 @@ export const checkBinaryExpression = (
       } else {
         return new TypeError(node, LHS, 'string or number', typeOf(left))
       }
+    case '!==':
+    case '===':
+      return
     default:
       return
   }
