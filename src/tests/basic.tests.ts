@@ -209,7 +209,7 @@ describe('binop', () => {
     test('diff types', () => {
       const code: string = '"234" <> 234;'
       return runInContext(code, context, options).then(data => {
-        expect((data as Finished).value).toBe(false)
+        expect((data as Finished).value).toBe(true)
       })
     })
   })
@@ -273,7 +273,7 @@ describe('binop', () => {
     test('compare strings', () => {
       const code: string = '"abcd" <= "aacd";'
       return runInContext(code, context, options).then(data => {
-        expect((data as Finished).value).toBe(true)
+        expect((data as Finished).value).toBe(false)
       })
     })
   })
