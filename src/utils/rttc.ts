@@ -41,13 +41,13 @@ const isBool = (v: Value) => typeOf(v) === 'boolean'
 const isObject = (v: Value) => typeOf(v) === 'object'
 const isList = (v: Value) => typeOf(v) === 'array'
 const isNil = (v: Value) => typeOf(v) === 'null'
-const isListOrTuple = (v: TypedValue) => v.type === 'list' || v.type === 'tuple'
 
 const isTypedNumber = (v: TypedValue) => v.type === 'number'
 const isTypedString = (v: TypedValue) => v.type === 'string'
 const isTypedBool = (v: TypedValue) => v.type === 'boolean'
 const isTypedList = (v: TypedValue) => v.type === 'list'
 const isTypedTuple = (v: TypedValue) => v.type === 'tuple'
+const isListOrTuple = (v: TypedValue) => isTypedList(v) || isTypedTuple(v)
 
 
 // We need to define our own typeof in order for null/array to display properly in error messages
@@ -111,9 +111,8 @@ const typeArrToString = (arr: SmlType[]) => {
 
 export const getTypedList = (first: undefined | TypedValue, val: any) => {
   if (first === undefined) {
-    return { type: 'list', value: val }
+    return { type: 'list', typeArr: [], value: val }
   } else {
-    console.log(first)
     const listType = isListOrTuple(first) ? first.typeArr! : [first.type]
     listType.push('list')
     return { type: 'list', typeArr: listType, value: val }

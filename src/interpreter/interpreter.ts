@@ -507,12 +507,27 @@ const microcode : { [tag: string]: Function } = {
   list_merge_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const list = []
 
-    //TODO: check both is list + same type1::
+    let first = undefined
+    //TODO: check both is list + same type
     for (let i = 0; i < cmd.len; i++) {
-      list.push(...S.pop())
+      const elem = S.pop()
+
+      if (elem.value.length === 0) {
+        continue
+      }
+
+      if (first === undefined) {
+        first = elem.value[0]
+      }
+
+      if (!rttc.isTypeEqual(first, elem)) {
+        throw new rttc.TypeError(cmd.node, ' as list element to merge @', first, elem)
+      }
+
+      list.push(...elem.value)
     }
     
-    S.push({type: 'list', value: list})
+    S.push(rttc.getTypedList(first, list))
   },
   list_append_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const temp = []
@@ -550,7 +565,7 @@ const microcode : { [tag: string]: Function } = {
       }
 
       if (!rttc.isTypeEqual(first, elem)) {
-        throw new rttc.TypeError(cmd.node, ' as list element to append', first, elem)
+        throw new rttc.TypeError(cmd.node, ' as list element to append ::', first, elem)
       }
 
       result.push(elem.value)
@@ -571,11 +586,15 @@ const microcode : { [tag: string]: Function } = {
   record_i: (cmd : { index: number }) => {
     const tuple = S.pop()
 
-    if (cmd.index < 0 || cmd.index >= tuple.length) {
+    if (tuple.type !== 'tuple') {
+      throw Error("# can only be used on tuples")
+    }
+
+    if (cmd.index < 0 || cmd.index >= tuple.value.length) {
       throw Error("index out of bounds")
     }
 
-    S.push(rttc.getTypedLiteral(tuple[cmd.index]))
+    S.push(rttc.getTypedLiteral(tuple.value[cmd.index]))
   },
   app_i: (cmd: { arity: number }) => {
     const args = []
