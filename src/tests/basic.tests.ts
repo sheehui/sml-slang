@@ -278,3 +278,47 @@ describe('binop', () => {
     })
   })
 })
+
+describe('fun declaration', () => {
+  test('basic fun declaration', () => {
+    const code: string = 'fun test x = x + 1; test(1);'
+    runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(2)
+    })
+  })
+
+  test('fun declaration with let expr', () => {
+    const code: string = 'fun test x = let val y = 2; in x + y; end; test(1);'
+    runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(3)
+    })
+  })
+
+  test('fun declaration with nested fun declaration', () => {
+    const code: string = 'fun test x = let fun test2 y = y + x; in test2(2); end; test(1);'
+    runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(3)
+    })
+  })
+
+  test('unbound variable in fun declaration', () => {
+    const code: string = 'fun test x = x + y;'
+    runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Unbound variable y")
+    })
+  })
+
+  test('unbound variable in nested fun declaration', () => {
+    const code: string = 'fun test x = let fun test2 y = y + x + z; in test2(2); end; test(1);'
+    runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Unbound variable z")
+    })
+  })
+
+  test('fun declaration supports recursive call', () => {
+    const code: string = 'fun test x = if x > 0 then test(x - 1) else 10; test(3);'
+    runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(10)
+    })
+  })
+})
