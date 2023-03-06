@@ -322,3 +322,65 @@ describe('fun declaration', () => {
     })
   })
 })
+
+describe('lambdas', () => {
+  test('basic lambda', () => {
+    const code: string = '(fn x => x + 1)(1);'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(2)
+    })
+  })
+
+  test('lambda with multiple params', () => {
+    const code: string = '(fn (x, y, z) => x + y + z)(1, 2, 3);'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(6)
+    })
+  })
+
+  test('lambda with let expr', () => {
+    const code: string = '(fn x => let val y = 2; in x + y; end)(1);'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(3)
+    })
+  })
+
+  test('lambda with nested lambda', () => {
+    const code: string = '(fn x => (fn y => y + x)(2)) (1);'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(3)
+    })
+  })
+
+  test('unbound variable in lambda', () => {
+    const code: string = 'fn x => x + y;'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Unbound variable y")
+    })
+  })
+
+  test('unbound variable in nested lambda', () => {
+    const code: string = '(fn x => (fn y => y + x + z)(2)) (1);'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Unbound variable z")
+    })
+  })
+
+  test('lambda variable declaration', () => {
+    const code: string = 'val test = fn x => (fn y => y + x)(2); test(1)'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(3)
+    })
+  })
+
+  test('lambda variable declaration does not support recursive call', () => {
+    const code: string = `val test = fn x => 
+                            if x > 0 
+                              then test(x - 1) 
+                              else 10; 
+                          test(3);`
+    return runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Unbound variable test")
+    })
+  })
+})
