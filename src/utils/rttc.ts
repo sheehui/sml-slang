@@ -11,27 +11,18 @@ export class TypeError extends RuntimeSourceError {
   public severity = ErrorSeverity.ERROR
   public location: es.SourceLocation
 
-  constructor(node: es.Node, public side: string, public expected: string, public got: string) {
+  constructor(node: es.Node, public side: string, public expected: TypedValue | string, public got: TypedValue | string) {
     super(node)
+    this.expected = getTypeString(expected)
+    this.got = getTypeString(got)
   }
 
   public explain() {
-    return `Expected ${this.expected}${this.side}, got ${this.got}.`
+    return `Expected ${getTypeString(this.expected)}${this.side}, got ${getTypeString(this.got)}.`
   }
 
   public elaborate() {
     return this.explain()
-  }
-}
-
-// We need to define our own typeof in order for null/array to display properly in error messages
-const typeOf = (v: Value) => {
-  if (v === null) {
-    return 'null'
-  } else if (Array.isArray(v)) {
-    return 'array'
-  } else {
-    return typeof v
   }
 }
 
@@ -45,6 +36,37 @@ const isBool = (v: Value) => typeOf(v) === 'boolean'
 const isObject = (v: Value) => typeOf(v) === 'object'
 const isList = (v: Value) => typeOf(v) === 'array'
 const isNil = (v: Value) => typeOf(v) === 'null'
+
+// We need to define our own typeof in order for null/array to display properly in error messages
+const typeOf = (v: Value) => {
+  if (v === null) {
+    return 'null'
+  } else if (Array.isArray(v)) {
+    return 'array'
+  } else {
+    return typeof v
+  }
+}
+
+const getTypeString = (val: TypedValue | string) : string => {
+  if (typeof(val) === 'string') {
+    return val
+  } else if (Array.isArray(val.type)) {
+    return val.type.join(" ")
+  } else {
+    return val.type
+  }
+}
+
+export const getTypedList = (first: undefined | TypedValue, val: any) => {
+  if (first === undefined) {
+    return {type: 'list', value: val}
+  } else {
+    const listType = Array.isArray(first.type) ? first.type : [first.type]
+    listType.push('list')
+    return {type: listType, value: val}
+  }
+}
 
 export const getTypedLiteral = (val: any): TypedValue => {
   if (isBool(val)) {
@@ -60,11 +82,16 @@ export const getTypedLiteral = (val: any): TypedValue => {
   }
 }
 
-export const checkUnaryExpression = (node: es.Node, operator: es.UnaryOperator, value: Value) => {
-  if (operator === '-' && !isNumber(value)) {
-    return new TypeError(node, '', 'number', typeOf(value))
-  } else if (operator === '~' && !isBool(value)) {
-    return new TypeError(node, '', 'boolean', typeOf(value))
+const isTypedNumber = (v: TypedValue) => v.type === 'number'
+const isTypedString = (v: TypedValue) => v.type === 'string'
+const isTypedBool = (v: TypedValue) => v.type === 'boolean'
+// const isTypedList = (v: TypedValue) => v.type === 'list'
+
+export const checkUnaryExpression = (node: es.Node, operator: es.UnaryOperator, value: TypedValue) => {
+  if (operator === '-' && !isTypedNumber(value)) {
+    return new TypeError(node, '', 'number', value)
+  } else if (operator === '~' && !isTypedBool(value)) {
+    return new TypeError(node, '', 'boolean', value)
   } else {
     return undefined
   }
@@ -73,15 +100,15 @@ export const checkUnaryExpression = (node: es.Node, operator: es.UnaryOperator, 
 export const checkBinaryExpression = (
   node: es.Node,
   operator: es.BinaryOperator,
-  left: Value,
-  right: Value
+  left: TypedValue,
+  right: TypedValue
 ) => {
   switch (operator) {
     case '^':
-      if (!isString(left)) {
-        return new TypeError(node, LHS, 'string', typeOf(left))
-      } else if (!isString(right)) {
-        return new TypeError(node, RHS, 'string', typeOf(right))
+      if (!isTypedString(left)) {
+        return new TypeError(node, LHS, 'string', left)
+      } else if (!isTypedString(right)) {
+        return new TypeError(node, RHS, 'string', right)
       } else {
         return
       }
@@ -90,10 +117,10 @@ export const checkBinaryExpression = (
     case '*':
     case '/':
     case '%':
-      if (!isNumber(left)) {
-        return new TypeError(node, LHS, 'number', typeOf(left))
-      } else if (!isNumber(right)) {
-        return new TypeError(node, RHS, 'number', typeOf(right))
+      if (!isTypedNumber(left)) {
+        return new TypeError(node, LHS, 'number', left)
+      } else if (!isTypedNumber(right)) {
+        return new TypeError(node, RHS, 'number', right)
       } else {
         return
       }
@@ -101,12 +128,12 @@ export const checkBinaryExpression = (
     case '<=':
     case '>':
     case '>=':
-      if (isNumber(left)) {
-        return isNumber(right) ? undefined : new TypeError(node, RHS, 'number', typeOf(right))
-      } else if (isString(left)) {
-        return isString(right) ? undefined : new TypeError(node, RHS, 'string', typeOf(right))
+      if (isTypedNumber(left)) {
+        return isTypedNumber(right) ? undefined : new TypeError(node, RHS, 'number', right)
+      } else if (isTypedString(left)) {
+        return isTypedString(right) ? undefined : new TypeError(node, RHS, 'string', right)
       } else {
-        return new TypeError(node, LHS, 'string or number', typeOf(left))
+        return new TypeError(node, LHS, 'string or number', left)
       }
     case '!==':
     case '===':
@@ -116,23 +143,23 @@ export const checkBinaryExpression = (
   }
 }
 
-export const checkIfStatement = (node: es.Node, test: Value) => {
-  return isBool(test) ? undefined : new TypeError(node, ' as condition', 'boolean', typeOf(test))
+export const checkIfStatement = (node: es.Node, test: TypedValue) => {
+  return isTypedBool(test) ? undefined : new TypeError(node, ' as condition', 'boolean', test)
 }
 
-export const checkMemberAccess = (node: es.Node, obj: Value, prop: Value) => {
-  if (isObject(obj)) {
-    return isString(prop) ? undefined : new TypeError(node, ' as prop', 'string', typeOf(prop))
-  } else if (isList(obj)) {
-    return isArrayIndex(prop)
-      ? undefined
-      : isNumber(prop)
-      ? new TypeError(node, ' as prop', 'array index', 'other number')
-      : new TypeError(node, ' as prop', 'array index', typeOf(prop))
-  } else {
-    return new TypeError(node, '', 'object or array', typeOf(obj))
-  }
-}
+// export const checkMemberAccess = (node: es.Node, obj: Value, prop: Value) => {
+//   if (isObject(obj)) {
+//     return isString(prop) ? undefined : new TypeError(node, ' as prop', 'string', typeOf(prop))
+//   } else if (isList(obj)) {
+//     return isArrayIndex(prop)
+//       ? undefined
+//       : isNumber(prop)
+//       ? new TypeError(node, ' as prop', 'array index', 'other number')
+//       : new TypeError(node, ' as prop', 'array index', typeOf(prop))
+//   } else {
+//     return new TypeError(node, '', 'object or array', typeOf(obj))
+//   }
+// }
 
 export const isIdentifier = (node: any): node is es.Identifier => {
   return (node as es.Identifier).name !== undefined

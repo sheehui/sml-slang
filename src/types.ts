@@ -256,12 +256,12 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
-export type SmlType = 'boolean' | 'null' | 'number' | 'string' | 'undefined' | 'list'
+export type SmlType = 'boolean' | 'null' | 'number' | 'string' | 'undefined' | 'list' | 'tuple' 
 
 export type SmlValue = string | number | boolean
 
 export interface TypedValue {
-  type: SmlType
+  type: SmlType | Array<SmlType>
   value: SmlValue| Array<SmlValue>
 }
 

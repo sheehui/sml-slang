@@ -8,7 +8,7 @@ import {
   InvalidNumberOfArguments
 } from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { Thunk } from '../types'
+import { Thunk, TypedValue } from '../types'
 import { locationDummyNode } from './astCreator'
 import * as create from './astCreator'
 import { makeWrapper } from './makeWrapper'
@@ -143,18 +143,18 @@ export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocat
 
 export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
   if (operator === '~') {
-    return !value
+    return !value.value
   } else if (operator === '-') {
-    return -value
+    return -value.value
   } else {
-    return +value
+    return +value.value
   }
 }
 
 export function binaryOp(
   operator: BinaryOperator,
-  left: any,
-  right: any,
+  left: TypedValue,
+  right: TypedValue,
   loc: SourceLocation
 ) {
   left = forceIt(left)
@@ -175,55 +175,61 @@ export function binaryOp(
 }
 
 export function evaluateBinaryExpression(operator: BinaryOperator, left: any, right: any) {
+  const l = left.value
+  const r = right.value
   switch (operator) {
     case '+':
     case '^':
-      return left + right
+      return l + r
     case '-':
-      return left - right
+      return l - r
     case '*':
-      return left * right
+      return l * r
     case '/':
-      return Math.floor(left / right)
+      return Math.floor(l / r)
     case '%':
-      return left % right
+      return l % r
     case '===':
-      return left === right
+      return l === r
     case '!==':
-      return left !== right
+      return l !== r
     case '<=':
-      return left <= right
+      return l <= r
     case '<':
-      return left < right
+      return l < r
     case '>':
-      return left > right
+      return l > r
     case '>=':
-      return left >= right
+      return l >= r
     default:
       return Error("Invalid binary operator " + operator)
   }
 }
 
-export const setProp = (obj: any, prop: any, value: any, line: number, column: number) => {
-  const dummy = locationDummyNode(line, column)
-  const error = rttc.checkMemberAccess(dummy, obj, prop)
-  if (error === undefined) {
-    return (obj[prop] = value)
-  } else {
-    throw error
-  }
+export const isArrayEqual = (left: any, right: any) => {
+  return left.toString() === right.toString()
 }
 
-export const getProp = (obj: any, prop: any, line: number, column: number) => {
-  const dummy = locationDummyNode(line, column)
-  const error = rttc.checkMemberAccess(dummy, obj, prop)
-  if (error === undefined) {
-    if (obj[prop] !== undefined && !obj.hasOwnProperty(prop)) {
-      throw new GetInheritedPropertyError(dummy, obj, prop)
-    } else {
-      return obj[prop]
-    }
-  } else {
-    throw error
-  }
-}
+// export const setProp = (obj: any, prop: any, value: any, line: number, column: number) => {
+//   const dummy = locationDummyNode(line, column)
+//   const error = rttc.checkMemberAccess(dummy, obj, prop)
+//   if (error === undefined) {
+//     return (obj[prop] = value)
+//   } else {
+//     throw error
+//   }
+// }
+
+// export const getProp = (obj: any, prop: any, line: number, column: number) => {
+//   const dummy = locationDummyNode(line, column)
+//   const error = rttc.checkMemberAccess(dummy, obj, prop)
+//   if (error === undefined) {
+//     if (obj[prop] !== undefined && !obj.hasOwnProperty(prop)) {
+//       throw new GetInheritedPropertyError(dummy, obj, prop)
+//     } else {
+//       return obj[prop]
+//     }
+//   } else {
+//     throw error
+//   }
+// }

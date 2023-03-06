@@ -3,9 +3,9 @@ import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { Context, Environment, Value } from '../types'
+import { Context, Environment, SmlValue, TypedValue, Value } from '../types'
 import { Stack } from '../types'
-import { binaryOp, unaryOp } from '../utils/operators'
+import { binaryOp, isArrayEqual, unaryOp } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 
 const step_limit = 1000000
@@ -117,7 +117,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     return {
       tag, 
-      elems
+      elems,
+      node
     }
   },
 
@@ -331,7 +332,9 @@ const microcode : { [tag: string]: Function } = {
     }
   },
   lit: (cmd: { val: any, isCheck: boolean }) => {
-    if (!cmd.isCheck) { return S.push(cmd.val) }
+    if (!cmd.isCheck) { 
+      return S.push(rttc.getTypedLiteral(cmd.val)) 
+    }
   },
   id: (cmd: { sym: string, isCheck: boolean }) => {
     let env: Environment | null = E 
@@ -405,8 +408,8 @@ const microcode : { [tag: string]: Function } = {
     }
     
   },
-  list_lit: (cmd: { elems: any[], isCheck: boolean }) => {
-    !cmd.isCheck && A.push({ tag: 'list_lit_i', len: cmd.elems.length })
+  list_lit: (cmd: { elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+    !cmd.isCheck && A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
       A.push(x)
@@ -465,12 +468,14 @@ const microcode : { [tag: string]: Function } = {
   binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
     const right = S.pop() 
     const left = S.pop()
-    S.push(binaryOp(cmd.sym, left, right, cmd.loc))
+    const result = binaryOp(cmd.sym, left, right, cmd.loc)
+    S.push(rttc.getTypedLiteral(result))
     // S.push(evaluateBinaryExpression(cmd.sym, left, right))
   },
   unop_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
     const arg = S.pop()
-    S.push(unaryOp(cmd.sym, arg, cmd.loc))
+    const result = unaryOp(cmd.sym, arg, cmd.loc)
+    S.push(rttc.getTypedLiteral(result))
     // S.push(evaluateUnaryExpression(cmd.sym, arg))
   },
   env_i: (cmd: { env: Environment }) => {
@@ -479,13 +484,25 @@ const microcode : { [tag: string]: Function } = {
   assmt_i: (cmd: { sym: string }) => {
     E.head[cmd.sym] = S.peek() 
   },
-  list_lit_i: (cmd: { len: number }) => {
+  list_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const list = []
     // TODO: type checking
+    let first = undefined
     for (let i = 0; i < cmd.len; i++) {
-      list.push(S.pop())
+      const elem : TypedValue = S.pop()
+
+      if (first == undefined) {
+        first = elem
+      }
+
+      if (!isArrayEqual(first.type, elem.type)) {
+        throw new rttc.TypeError(cmd.node, '', first, elem)
+      }
+
+      list.push(elem.value)
     }
-    S.push(list)
+
+    S.push(rttc.getTypedList(first, list))
   },
   list_merge_i: (cmd: { len: number }) => {
     const list = []
@@ -495,7 +512,7 @@ const microcode : { [tag: string]: Function } = {
       list.push(...S.pop())
     }
     
-    S.push(list)
+    S.push({type: 'list', value: list})
   },
   list_append_i: (cmd: { len: number }) => {
     const list = []
@@ -507,14 +524,14 @@ const microcode : { [tag: string]: Function } = {
       list.push(elem)
     }
     
-    S.push(list)
+    S.push({type: 'list', value: list})
   },
   tuple_lit_i: (cmd: { len: number }) => {
-    const list = []
+    const tuple = []
     for (let i = 0; i < cmd.len; i++) {
-      list.push(S.pop())
+      tuple.push(S.pop())
     }
-    S.push(list)
+    S.push({type: 'tuple', value: tuple})
   },
   record_i: (cmd : { index: number }) => {
     const tuple = S.pop()
@@ -523,7 +540,7 @@ const microcode : { [tag: string]: Function } = {
       throw Error("index out of bounds")
     }
 
-    S.push(tuple[cmd.index])
+    S.push(rttc.getTypedLiteral(tuple[cmd.index]))
   },
   app_i: (cmd: { arity: number }) => {
     const args = []
