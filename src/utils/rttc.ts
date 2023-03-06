@@ -1,7 +1,7 @@
 import * as es from 'estree'
 
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { ErrorSeverity, ErrorType, TypedValue, Value } from '../types'
+import { ErrorSeverity, ErrorType, SmlType, TypedValue, Value } from '../types'
 
 const LHS = ' on left hand side of operation'
 const RHS = ' on right hand side of operation'
@@ -72,10 +72,40 @@ export const isTypeEqual = (left: TypedValue, right: TypedValue) : boolean => {
 const getTypeString = (val: TypedValue | string): string => {
   if (typeof val === 'string') {
     return val
-  } else if (isListOrTuple(val)) {
-    return val.typeArr!.join(' ')
+  } else if (isTypedList(val)) {
+    return typeArrToString(val.typeArr!)
+  } else if (isTypedTuple(val)) {
+    return typeArrToString(val.typeArr!)
   } else {
     return val.type
+  }
+}
+
+const typeArrToString = (arr: SmlType[]) => {
+  if (arr[arr.length - 1] == 'list') {
+    let str = ""
+
+    arr.forEach((element: SmlType | Array<SmlType>) => {
+      if (Array.isArray(element)) {
+        str += " " + typeArrToString(element)
+      } else {
+        str += " " + element
+      }
+    });
+
+    return str.trim()
+  } else {
+    let str = ""
+
+    arr.forEach((element: SmlType | Array<SmlType>) => {
+      if (Array.isArray(element)) {
+        str += " * " + typeArrToString(element)
+      } else {
+        str += " * " + element
+      }
+    });
+
+    return str.substring(3)
   }
 }
 

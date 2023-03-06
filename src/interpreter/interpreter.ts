@@ -415,7 +415,7 @@ const microcode : { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  list_merge: (cmd: { elems: any[], isCheck: boolean }) => {
+  list_merge: (cmd: { elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
     !cmd.isCheck && A.push({ tag: 'list_merge_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
@@ -429,7 +429,7 @@ const microcode : { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  tuple_lit: (cmd: {elems: any[], isCheck: boolean }) => {
+  tuple_lit: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
     !cmd.isCheck && A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
@@ -504,7 +504,7 @@ const microcode : { [tag: string]: Function } = {
 
     S.push(rttc.getTypedList(first, list))
   },
-  list_merge_i: (cmd: { len: number }) => {
+  list_merge_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const list = []
 
     //TODO: check both is list + same type1::
@@ -557,14 +557,16 @@ const microcode : { [tag: string]: Function } = {
     }
     
     S.push(rttc.getTypedList(first, result.reverse()))
-    // S.push({type: 'list', value: result.reverse()})
   },
-  tuple_lit_i: (cmd: { len: number }) => {
+  tuple_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const tuple = []
+    const type = []
     for (let i = 0; i < cmd.len; i++) {
-      tuple.push(S.pop())
+      const elem = S.pop()
+      tuple.push(elem.value)
+      type.push(rttc.getElemType(elem))
     }
-    S.push({type: 'tuple', value: tuple})
+    S.push({type: 'tuple', typeArr: type, value: tuple})
   },
   record_i: (cmd : { index: number }) => {
     const tuple = S.pop()
