@@ -331,7 +331,7 @@ const microcode : { [tag: string]: Function } = {
     }
   },
   lit: (cmd: { val: any, isCheck: boolean }) => {
-    if (!cmd.isCheck) { return S.push(rttc.getTypedLiteral(cmd.val)) }
+    if (!cmd.isCheck) { return S.push(cmd.val) }
   },
   id: (cmd: { sym: string, isCheck: boolean }) => {
     let env: Environment | null = E 
