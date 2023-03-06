@@ -133,6 +133,25 @@ export const getTypedLiteral = (val: any): TypedValue => {
   }
 }
 
+
+const getType = (type: any) => {
+  if (Array.isArray(type)) {
+    return type[type.length - 1] === 'list' ? 'list' : 'tuple'
+  } else {
+    return type
+  }
+}
+
+export const getTypedTupleElem = (val: any, index: number) => {
+  const elem = val.value[index]
+  const type = getType(val.typeArr[index])
+  return {
+    type,
+    typeArr: type === 'list' || type === 'tuple' ? val.typeArr[index] : undefined,
+    value: elem
+  }
+}
+
 // export const getListElemType = (v: TypedValue) => {
 //   const type = v.typeArr
 //   type?.pop()

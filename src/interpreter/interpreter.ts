@@ -594,7 +594,7 @@ const microcode : { [tag: string]: Function } = {
       throw Error("index out of bounds")
     }
 
-    S.push(rttc.getTypedLiteral(tuple.value[cmd.index]))
+    S.push(rttc.getTypedTupleElem(tuple, cmd.index))
   },
   app_i: (cmd: { arity: number }) => {
     const args = []
@@ -634,7 +634,7 @@ const microcode : { [tag: string]: Function } = {
       throw error
     }
     
-    A.push(pred ? cmd.cons : cmd.alt) 
+    A.push(pred.value ? cmd.cons : cmd.alt) 
   },
   closure_i: (cmd: { params: any[], body: any, env: Environment }) => {
     S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env})
