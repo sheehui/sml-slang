@@ -384,3 +384,77 @@ describe('lambdas', () => {
     })
   })
 })
+
+describe('val rec', () => {
+  test("recursive declaration without 'rec' is not allowed", () => {
+    const code: string = `val test = fn x => 
+                            if (x > 0) 
+                              then test(x - 1)
+                              else 200; 
+                          test(3);`
+    return runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Unbound variable test")
+    })
+  })
+
+  test("recursive declaration with 'rec' is allowed", () => {
+    const code: string = `val rec test = fn x => 
+                            if (x > 0) 
+                              then test(x - 1)
+                              else 200; 
+                          test(3);`
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(200)
+    })
+  })
+
+  test("within local declaration", () => {
+    const code : string = `
+                          let 
+                            val rec test = fn x => 
+                            if (x > 0) 
+                              then test(x - 1)
+                              else 200; 
+                          in
+                            test(3);
+                          end;`
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(200)
+    })
+  })
+
+  test("within fun declaration", () => {
+    const code : string = `
+                          fun hello y = 
+                            let 
+                              val rec test = fn x => 
+                              if (x > 0) 
+                                then test(x - 1)
+                                else 200; 
+                            in
+                              test(y);
+                            end; 
+                          hello(7);`
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(200)
+    })
+  })
+
+  test("within rec lambda", () => {
+    const code : string = `
+                          val rec hello = fn y => 
+                            let 
+                              val rec test = fn x => 
+                              if (x > 0) 
+                                then test(x - 1)
+                                else 200; 
+                            in
+                              if (test(y) = 200) then 199 else hello(y);
+                            end; 
+                          hello(7);`
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(199)
+    })
+  })
+
+})
