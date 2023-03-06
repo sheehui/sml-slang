@@ -397,7 +397,7 @@ const microcode : { [tag: string]: Function } = {
     // extend environment by 1 frame for block 
     const head = {} 
     cmd.params.forEach(param => head[param.sym] = null) 
-    if (cmd.id) { // allows recursive functions 
+    if (cmd.id) { // allows recursive functions (for 'fun' declarations only)
       head[cmd.id.sym] = null 
     }
     E = {

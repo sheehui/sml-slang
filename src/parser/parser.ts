@@ -17,6 +17,7 @@ import {
   EqualContext,
   ExpressionContext,
   FuncAppContext,
+  FuncExprContext,
   FunDecContext,
   GreaterThanContext,
   GreaterThanOrEqualContext,
@@ -418,19 +419,37 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   }
 
   visitFuncApp(ctx: FuncAppContext) : es.Expression {
+    const callee : es.Expression = this.visit(ctx._callee); 
+    if (!['Identifier', 'FunctionExpression'].includes(callee.type)) {
+      throw Error(`Cannot apply to a ${callee.type}`)
+    }
     const exprs = ctx.expression() 
     const args = []
-    for (let i = 0; i < exprs.length; i++) {
+    for (let i = 1; i < exprs.length; i++) { // skip the first expr as its the callee 
       args.push(exprs[i].accept(this))
     }
     return {
       type: 'CallExpression', 
-      callee: {
-        type: 'Identifier',
-        name: ctx.ID().text
-      },
+      callee,
       arguments: args,
       optional: false // not sure what this does yet 
+    }
+  }
+
+  visitFuncExpr(ctx: FuncExprContext) : es.Expression {
+    return {
+      type: 'FunctionExpression',
+      id: null,
+      params: new PatternGenerator().visit(ctx._params),
+      body: {
+        type: 'BlockStatement',
+        body: [
+          {
+            type: 'ExpressionStatement',
+            expression: new ExpressionGenerator().visit(ctx.expression()!)
+          }
+        ]
+      }
     }
   }
 
