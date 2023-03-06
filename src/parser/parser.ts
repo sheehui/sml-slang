@@ -500,14 +500,22 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
 
 class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
+    const init = new ExpressionGenerator().visit(ctx._value) // variable value
+    const id : es.Identifier = {
+      type: 'Identifier',
+      name: ctx._identifier.text! // '!' is a non-null assertion operator
+    }
+
+    if (ctx.REC() && init.type === 'FunctionExpression') { // 'rec' can only be specified for lambdas 
+      // set id on lambda so that var name can be bound within the func block
+      // var dec will basically behave like a 'fun' dec 
+      init.id = id 
+    }
     return [
       {
         type: 'VariableDeclarator',
-        id: {
-          type: 'Identifier',
-          name: ctx._identifier.text! // '!' is a non-null assertion operator
-        },
-        init: new ExpressionGenerator().visit(ctx._value)
+        id,
+        init
       }
     ]
   }

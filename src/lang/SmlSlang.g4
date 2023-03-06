@@ -39,6 +39,7 @@ DO: 'do';
 SEMIC: ';'; 
 WILDC: '_'; 
 NIL: 'nil'; 
+REC: 'rec'; 
 NUMBER: DIGIT+;
 TUPLE_ACCESS: HASH [1-9] DIGIT*;
 STRING: '"' (~["])+ '"';
@@ -104,7 +105,7 @@ seqDecl
    ;
 
 declaration
-   : VAL identifier=ID EQUAL value=expression                     # VarDec
+   : VAL REC?  identifier=ID EQUAL value=expression                     # VarDec
    | FUN identifier=ID params=pattern EQUAL value=expression      # FunDec
    ;
 
