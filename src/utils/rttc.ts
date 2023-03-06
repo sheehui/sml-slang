@@ -1,7 +1,7 @@
 import * as es from 'estree'
 
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { ErrorSeverity, ErrorType, Value } from '../types'
+import { ErrorSeverity, ErrorType, TypedValue, Value } from '../types'
 
 const LHS = ' on left hand side of operation'
 const RHS = ' on right hand side of operation'
@@ -43,7 +43,22 @@ const isArrayIndex = (v: Value) => isNumber(v) && v >>> 0 === v && v < 2 ** 32 -
 const isString = (v: Value) => typeOf(v) === 'string'
 const isBool = (v: Value) => typeOf(v) === 'boolean'
 const isObject = (v: Value) => typeOf(v) === 'object'
-const isArray = (v: Value) => typeOf(v) === 'array'
+const isList = (v: Value) => typeOf(v) === 'array'
+const isNil = (v: Value) => typeOf(v) === 'null'
+
+export const getTypedLiteral = (val: any): TypedValue => {
+  if (isBool(val)) {
+    return { type: 'boolean', value: val }
+  } else if (isString(val)) {
+    return { type: 'string', value: val }
+  } else if (isNumber(val)) {
+    return { type: 'number', value: val }
+  } else if (isNil(val)) {
+    return { type: 'list', value: [] }
+  } else {
+    throw Error("Unexpected literal to type")
+  }
+}
 
 export const checkUnaryExpression = (node: es.Node, operator: es.UnaryOperator, value: Value) => {
   if (operator === '-' && !isNumber(value)) {
@@ -108,7 +123,7 @@ export const checkIfStatement = (node: es.Node, test: Value) => {
 export const checkMemberAccess = (node: es.Node, obj: Value, prop: Value) => {
   if (isObject(obj)) {
     return isString(prop) ? undefined : new TypeError(node, ' as prop', 'string', typeOf(prop))
-  } else if (isArray(obj)) {
+  } else if (isList(obj)) {
     return isArrayIndex(prop)
       ? undefined
       : isNumber(prop)
