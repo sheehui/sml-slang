@@ -261,7 +261,8 @@ export type SmlType = 'boolean' | 'null' | 'number' | 'string' | 'undefined' | '
 export type SmlValue = string | number | boolean
 
 export interface TypedValue {
-  type: SmlType | Array<SmlType>
+  type: SmlType
+  typeArr?: Array<SmlType>
   value: SmlValue| Array<SmlValue>
 }
 

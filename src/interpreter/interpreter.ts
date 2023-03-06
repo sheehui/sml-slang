@@ -3,9 +3,9 @@ import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { Context, Environment, SmlValue, TypedValue, Value } from '../types'
+import { Context, Environment, TypedValue, Value } from '../types'
 import { Stack } from '../types'
-import { binaryOp, isArrayEqual, unaryOp } from '../utils/operators'
+import { binaryOp, unaryOp } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 
 const step_limit = 1000000
@@ -422,7 +422,7 @@ const microcode : { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  list_append: (cmd: {elems: any[], isCheck: boolean }) => {
+  list_append: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
     !cmd.isCheck && A.push({ tag: 'list_append_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
@@ -495,8 +495,8 @@ const microcode : { [tag: string]: Function } = {
         first = elem
       }
 
-      if (!isArrayEqual(first.type, elem.type)) {
-        throw new rttc.TypeError(cmd.node, '', first, elem)
+      if (!rttc.isTypeEqual(first, elem)) {
+        throw new rttc.TypeError(cmd.node, ' as list element', first, elem)
       }
 
       list.push(elem.value)
@@ -514,17 +514,50 @@ const microcode : { [tag: string]: Function } = {
     
     S.push({type: 'list', value: list})
   },
-  list_append_i: (cmd: { len: number }) => {
-    const list = []
+  list_append_i: (cmd: { len: number, node: es.ArrayExpression }) => {
+    const temp = []
+    let result = undefined
 
+    let first = undefined
     //TODO: check all are same type
     for (let i = 0; i < cmd.len; i++) {
-      const elem = S.pop()
-      // TODO: peek terminal node == null, unwrap second last node accordingly
-      list.push(elem)
+      temp.push(S.pop())
+    }
+
+    for (let i = cmd.len - 1; i >= 0; i--) {
+      const elem = temp[i]
+
+      if (result === undefined) {
+        if (elem.type !== 'list') {
+          throw new rttc.TypeError(cmd.node, " at the end of stmt", 'list', elem)
+        }
+
+        if (elem.value.length !== 0) {
+          first = elem.value[0] // assign any elem
+        }
+
+        result = elem.value
+
+        continue
+      }
+
+      if (first === undefined) {
+        result.push(elem.value)
+        if (elem.value.length !== 0) {
+          first = elem
+        }
+        continue
+      }
+
+      if (!rttc.isTypeEqual(first, elem)) {
+        throw new rttc.TypeError(cmd.node, ' as list element to append', first, elem)
+      }
+
+      result.push(elem.value)
     }
     
-    S.push({type: 'list', value: list})
+    S.push(rttc.getTypedList(first, result.reverse()))
+    // S.push({type: 'list', value: result.reverse()})
   },
   tuple_lit_i: (cmd: { len: number }) => {
     const tuple = []

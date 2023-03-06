@@ -206,10 +206,6 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
   }
 }
 
-export const isArrayEqual = (left: any, right: any) => {
-  return left.toString() === right.toString()
-}
-
 // export const setProp = (obj: any, prop: any, value: any, line: number, column: number) => {
 //   const dummy = locationDummyNode(line, column)
 //   const error = rttc.checkMemberAccess(dummy, obj, prop)

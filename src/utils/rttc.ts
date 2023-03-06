@@ -11,7 +11,12 @@ export class TypeError extends RuntimeSourceError {
   public severity = ErrorSeverity.ERROR
   public location: es.SourceLocation
 
-  constructor(node: es.Node, public side: string, public expected: TypedValue | string, public got: TypedValue | string) {
+  constructor(
+    node: es.Node,
+    public side: string,
+    public expected: TypedValue | string,
+    public got: TypedValue | string
+  ) {
     super(node)
     this.expected = getTypeString(expected)
     this.got = getTypeString(got)
@@ -36,6 +41,14 @@ const isBool = (v: Value) => typeOf(v) === 'boolean'
 const isObject = (v: Value) => typeOf(v) === 'object'
 const isList = (v: Value) => typeOf(v) === 'array'
 const isNil = (v: Value) => typeOf(v) === 'null'
+const isListOrTuple = (v: TypedValue) => v.type === 'list' || v.type === 'tuple'
+
+const isTypedNumber = (v: TypedValue) => v.type === 'number'
+const isTypedString = (v: TypedValue) => v.type === 'string'
+const isTypedBool = (v: TypedValue) => v.type === 'boolean'
+const isTypedList = (v: TypedValue) => v.type === 'list'
+const isTypedTuple = (v: TypedValue) => v.type === 'tuple'
+
 
 // We need to define our own typeof in order for null/array to display properly in error messages
 const typeOf = (v: Value) => {
@@ -48,11 +61,19 @@ const typeOf = (v: Value) => {
   }
 }
 
-const getTypeString = (val: TypedValue | string) : string => {
-  if (typeof(val) === 'string') {
+export const isTypeEqual = (left: TypedValue, right: TypedValue) : boolean => {
+  if ((isTypedList(left) && isTypedList(right)) || (isTypedTuple(left) && isTypedTuple(right))) {
+    return left.typeArr?.toString() === right.typeArr?.toString()
+  } else {
+    return left.type === right.type
+  }
+}
+
+const getTypeString = (val: TypedValue | string): string => {
+  if (typeof val === 'string') {
     return val
-  } else if (Array.isArray(val.type)) {
-    return val.type.join(" ")
+  } else if (isListOrTuple(val)) {
+    return val.typeArr!.join(' ')
   } else {
     return val.type
   }
@@ -60,11 +81,12 @@ const getTypeString = (val: TypedValue | string) : string => {
 
 export const getTypedList = (first: undefined | TypedValue, val: any) => {
   if (first === undefined) {
-    return {type: 'list', value: val}
+    return { type: 'list', value: val }
   } else {
-    const listType = Array.isArray(first.type) ? first.type : [first.type]
+    console.log(first)
+    const listType = isListOrTuple(first) ? first.typeArr! : [first.type]
     listType.push('list')
-    return {type: listType, value: val}
+    return { type: 'list', typeArr: listType, value: val }
   }
 }
 
@@ -76,18 +98,31 @@ export const getTypedLiteral = (val: any): TypedValue => {
   } else if (isNumber(val)) {
     return { type: 'number', value: val }
   } else if (isNil(val)) {
-    return { type: 'list', value: [] }
+    return { type: 'list', typeArr: [], value: [] }
   } else {
-    throw Error("Unexpected literal to type")
+    throw Error('Unexpected literal to type')
   }
 }
 
-const isTypedNumber = (v: TypedValue) => v.type === 'number'
-const isTypedString = (v: TypedValue) => v.type === 'string'
-const isTypedBool = (v: TypedValue) => v.type === 'boolean'
-// const isTypedList = (v: TypedValue) => v.type === 'list'
+// export const getListElemType = (v: TypedValue) => {
+//   const type = v.typeArr
+//   type?.pop()
+//   return type
+// }
 
-export const checkUnaryExpression = (node: es.Node, operator: es.UnaryOperator, value: TypedValue) => {
+export const getElemType = (v: TypedValue) => {
+  if (isListOrTuple(v)) {
+    return v?.typeArr
+  } else {
+    return v.type
+  }
+}
+
+export const checkUnaryExpression = (
+  node: es.Node,
+  operator: es.UnaryOperator,
+  value: TypedValue
+) => {
   if (operator === '-' && !isTypedNumber(value)) {
     return new TypeError(node, '', 'number', value)
   } else if (operator === '~' && !isTypedBool(value)) {
