@@ -42,7 +42,7 @@ const isObject = (v: Value) => typeOf(v) === 'object'
 const isList = (v: Value) => typeOf(v) === 'array'
 const isNil = (v: Value) => typeOf(v) === 'null'
 
-const isTypedNumber = (v: TypedValue) => v.type === 'number'
+const isTypedNumber = (v: TypedValue) => v.type === 'int'
 const isTypedString = (v: TypedValue) => v.type === 'string'
 const isTypedBool = (v: TypedValue) => v.type === 'boolean'
 const isTypedList = (v: TypedValue) => v.type === 'list'
@@ -125,7 +125,7 @@ export const getTypedLiteral = (val: any): TypedValue => {
   } else if (isString(val)) {
     return { type: 'string', value: val }
   } else if (isNumber(val)) {
-    return { type: 'number', value: val }
+    return { type: 'int', value: val }
   } else if (isNil(val)) {
     return { type: 'list', typeArr: [], value: [] }
   } else {

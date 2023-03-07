@@ -290,7 +290,7 @@ describe('list creation with []', () => {
   test('literals of different types', () => {
     const code: string = '[1, true, 3];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected number as list element, got boolean")
+      expect(error.explain()).toMatch("Expected int as list element, got boolean")
     })
   })
 
@@ -304,7 +304,7 @@ describe('list creation with []', () => {
   test('nested lists of different type', () => {
     const code: string = '[[1], ["hello"], [3]];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected number list as list element, got string list")
+      expect(error.explain()).toMatch("Expected int list as list element, got string list")
     })
   })
 })
