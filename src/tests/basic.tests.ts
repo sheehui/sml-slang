@@ -9,6 +9,9 @@ const options: Partial<IOptions> = {
   useSubst: false
 }
 
+/**
+ * LITERALS
+ */
 describe('literals', () => {
   test('Number literal expression', () => {
     const code: string = '5;'
@@ -53,6 +56,9 @@ describe('literals', () => {
   })
 })
 
+/**
+ * UNARY OPERATIONS
+ */
 describe('unop expressions', () => {
   test('negation', () => {
     const code: string = 'val num = 234; ~num;'
@@ -69,6 +75,9 @@ describe('unop expressions', () => {
   })
 })
 
+/**
+ * BINARY OPERATIONS
+ */
 describe('binop', () => {
   test('minus', () => {
     const code: string = '3 - 4;'
@@ -279,6 +288,9 @@ describe('binop', () => {
   })
 })
 
+/**
+ * LIST INSTANTIATION
+ */
 describe('list creation with []', () => {
   test('literals of same types', () => {
     const code: string = '[1, 2, 3];'
@@ -309,6 +321,9 @@ describe('list creation with []', () => {
   })
 })
 
+/**
+ * FUNCTION DECLARATIONS
+ */
 describe('fun declaration', () => {
   test('basic fun declaration', () => {
     const code: string = 'fun test x = x + 1; test(1);'
@@ -353,6 +368,9 @@ describe('fun declaration', () => {
   })
 })
 
+/**
+ * LAMBDAS
+ */
 describe('lambdas', () => {
   test('basic lambda', () => {
     const code: string = '(fn x => x + 1)(1);'
@@ -415,6 +433,9 @@ describe('lambdas', () => {
   })
 })
 
+/**
+ * RECURSIVE DECLARATIONS
+ */
 describe('val rec', () => {
   test("recursive declaration without 'rec' is not allowed", () => {
     const code: string = `val test = fn x => 
