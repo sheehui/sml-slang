@@ -55,7 +55,7 @@
     "prepare": "husky install",
     "publish_sicp_package": "./scripts/publish_sicp_package.sh",
     "repl": "yarn docs && yarn tsc --build --force && node dist/repl/repl.js", 
-    "test": "jest",
+    "test": "jest --silent",
     "test-coverage": "jest --coverage"
   },
   "repository": {
