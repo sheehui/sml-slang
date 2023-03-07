@@ -672,5 +672,6 @@ export function* evaluate(node: es.Node, context: Context) : any{
   yield* leave(context)
   console.log("\n=====EXIT EVALUATION=====\n")
   const r = S.pop(); 
+  console.log(r)
   return r.value
 }
