@@ -279,6 +279,36 @@ describe('binop', () => {
   })
 })
 
+describe('list creation with []', () => {
+  test('literals of same types', () => {
+    const code: string = '[1, 2, 3];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([1, 2, 3])
+    })
+  })
+
+  test('literals of different types', () => {
+    const code: string = '[1, true, 3];'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch("Expected number as list element, got boolean")
+    })
+  })
+
+  test('nested lists of same type', () => {
+    const code: string = '[[1], [2], [3]];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[1], [2], [3]])
+    })
+  })
+
+  test('nested lists of different type', () => {
+    const code: string = '[[1], ["hello"], [3]];'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch("Expected number list as list element, got string list")
+    })
+  })
+})
+
 describe('fun declaration', () => {
   test('basic fun declaration', () => {
     const code: string = 'fun test x = x + 1; test(1);'
