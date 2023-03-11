@@ -42,7 +42,7 @@
     "antlr4ts": "antlr4ts -visitor ./src/lang/SmlSlang.g4",
     "autocomplete": "node ./scripts/updateAutocompleteDocs.js",
     "benchmark": "jest --runInBand --testPathPattern='.*benchmark.*' --testPathIgnorePatterns='/dist/'",
-    "build": "yarn docs && yarn tsc --build --force",
+    "build": "yarn tsc --build --force",
     "build_sicp_package": "./scripts/build_sicp_package.sh",
     "ci": "yarn jsdoc && yarn autocomplete && yarn format:ci && yarn eslint",
     "compile": "yarn tsc",
@@ -54,7 +54,7 @@
     "prepublishOnly": "tsc",
     "prepare": "husky install",
     "publish_sicp_package": "./scripts/publish_sicp_package.sh",
-    "repl": "yarn docs && yarn tsc --build --force && node dist/repl/repl.js", 
+    "repl": "yarn build && node dist/repl/repl.js", 
     "test": "jest --silent",
     "test-coverage": "jest --coverage"
   },
