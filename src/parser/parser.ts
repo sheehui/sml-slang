@@ -551,10 +551,13 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
     const localDecs : es.VariableDeclarator[] = this.visitSeqDec(ctx._localDecs)
     const decs : es.VariableDeclarator[] = this.visitSeqDec(ctx._decs)
     if (decs.length > 0) {
+      // to handle nested local (i.e. if decs has its own 'locals' field)
+      const prevDecs : es.VariableDeclarator[] = decs[0]['locals'] ? decs[0]['locals'].decs.declarations : []
+      
       decs[0]['locals'] = {
         decs: {
           type: 'VariableDeclaration',
-          declarations: localDecs,
+          declarations: localDecs.concat(prevDecs),
           kind: 'const'
         },
         arity: decs.length 

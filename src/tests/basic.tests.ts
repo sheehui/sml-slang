@@ -509,3 +509,159 @@ describe('val rec', () => {
   })
 
 })
+
+/**
+ * LOCAL
+ */
+describe('local', () => {
+  test("local with var dec", () => {
+    const code : string = `
+      local 
+        val x = 1; 
+      in 
+        val y = x + 1; 
+      end; 
+      y; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(2)
+    })
+  })
+
+  test("local with fun", () => {
+    const code : string = `
+      local 
+        val x = 1;
+        fun z n = n + 3; 
+      in 
+        fun test n = n + x + z(x)
+      end; 
+      test(5); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(10)
+    })
+  })
+
+  test("local with var lambda", () => {
+    const code : string = `
+      local 
+        val x = 1;
+        val z = fn n => n + 3; 
+      in 
+        val test = fn n => n + x + z(x)
+      end; 
+      test(5); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(10)
+    })
+  })
+
+  test("local with recursive", () => {
+    const code : string = `
+      local 
+        val rec test = fn x => 
+        if (x > 0) 
+          then test(x - 1)
+          else 200;
+      in 
+        val x = test(3) + 1; 
+      end; 
+      x; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(201)
+    })
+  })
+
+  test("local with multiple dec", () => {
+    const code : string = `
+      local 
+        val x = 1;
+        val y = 2; 
+        val z = fn n => n + 3; 
+      in 
+        val a = x + y; 
+        val b = z(y); 
+        fun c n = n + a + b; 
+      end; 
+      c(2); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(10)
+    })
+  })
+
+  test("local decs can access vars outside block", () => {
+    const code : string = `
+      val x = 1; 
+      val y = 2; 
+      local 
+        val z = fn n => n + 3 + x; 
+      in 
+        val a = x + y; 
+        val b = z(y); 
+        fun c n = n + a + b; 
+      end; 
+      c(2); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(11)
+    })
+  })
+
+  test("local decs should override vars outside block", () => {
+    const code : string = `
+      val x = 1; 
+      val y = 2; 
+      local 
+        val x = 11; 
+        val y = 22; 
+      in 
+        val z = x + y; 
+      end; 
+      z; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(33)
+    })
+  })
+
+  test("local decs are inaccessible outside of the block", () => {
+    const code : string = `
+      local 
+        val x = 1; 
+      in 
+        val y = x + 1; 
+      end; 
+      x; 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Unbound variable x")
+    })
+  })
+
+  test("nested local declarations", () => {
+    const code : string = `
+      local 
+        local
+          val x = 1;  
+        in
+          val y = fn n => x + n; 
+        end; 
+        val z = y(1);  
+      in 
+        local 
+          val a = z + 3;
+        in 
+          fun b n = a * n; 
+        end; 
+      end; 
+      b(2); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toBe(10)
+    })
+  })
+})
