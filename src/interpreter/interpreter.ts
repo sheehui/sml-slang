@@ -214,15 +214,31 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     // const decl = node.declarations[0]
     // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
     const ids = [] 
-    const exprs = [] 
-    for (const decl of node.declarations) {
+    const exprs = []
+    let localStartIdx = null 
+    let localDecs = null 
+    let localArity = null 
+
+    for (let i = 0; i < node.declarations.length; i++) {
+      const decl = node.declarations[i]
       ids.push(decl.id.type === "Identifier" ? decl.id.name : null) // assume that vars are declared with identifier only
+
+      // deal with local declarations
+      const locals = (decl as any).locals 
+      if (locals) {
+        localStartIdx = i
+        localDecs = yield* evaluators[locals.decs.type](locals.decs, context)
+        localArity = locals.arity 
+      }
       exprs.push(yield* evaluators[decl.init!.type](decl.init!, context))
     }
     return {
       tag: 'var',
       ids, 
-      exprs
+      exprs,
+      localStartIdx,
+      localDecs,
+      localArity
     }
   },
 
@@ -371,15 +387,38 @@ const microcode : { [tag: string]: Function } = {
     cmd.arg['isCheck'] = cmd.isCheck 
     A.push(cmd.arg)
   }, 
-  var: (cmd: { ids: string[], exprs: any[], isCheck: boolean }) => {
+  var: (cmd: { ids: string[], exprs: any[], localStartIdx: number, localArity: number, localDecs: any, isCheck: boolean }) => {
     // A.push({ tag: 'lit', val: undefined })
     // A.push({ tag: 'pop_i'})
     for (let i = cmd.exprs.length - 1; i >= 0; i--) {
-      A.push({ tag: 'assmt', sym: cmd.ids[i], expr: cmd.exprs[i], isCheck: cmd.isCheck })
+      if (cmd.localStartIdx !== null && i === cmd.localStartIdx + cmd.localArity - 1) {
+        // restores the original env after 'local...in...end' is evaluated 
+        A.push({ tag: 'env_i', env: E })
+      }
+
+      A.push({ tag: 'assmt', 
+        sym: cmd.ids[i], 
+        expr: cmd.exprs[i], 
+        // frameOffset to skip the temp frame (if declaration is within 'local...in<HERE>end')
+        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0, 
+        isCheck: cmd.isCheck
+      })
+      
+      if (cmd.localStartIdx !== null && i === cmd.localStartIdx) {
+        // extend current env to temporarily store local declarations (i.e. 'local<THESE>in...end')
+        // extended env will be used to eval declarations within 'local...in<HERE>end' only
+        A.push(cmd.localDecs)
+        A.push({ tag: 'env_i', env: {
+          head: {}, 
+          tail: E, 
+          id: E.id,  
+          name: 'program'
+        }})
+      }
     }
   },
-  assmt: (cmd: { sym: string, expr: any, isCheck: boolean }) => {
-    A.push({ tag: 'assmt_i', sym: cmd.sym }) 
+  assmt: (cmd: { sym: string, expr: any, frameOffset: number, isCheck: boolean }) => {
+    A.push({ tag: 'assmt_i', sym: cmd.sym, frameOffset: cmd.frameOffset }) 
     cmd.expr['isCheck'] = cmd.isCheck
     A.push(cmd.expr) 
   }, 
@@ -481,7 +520,10 @@ const microcode : { [tag: string]: Function } = {
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env 
   },
-  assmt_i: (cmd: { sym: string }) => {
+  assmt_i: (cmd: { sym: string, frameOffset: number }) => {
+    if (cmd.frameOffset && E.tail) {
+      return E.tail.head[cmd.sym] = S.peek() 
+    } 
     E.head[cmd.sym] = S.peek() 
   },
   list_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {

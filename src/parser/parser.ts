@@ -26,6 +26,7 @@ import {
   LessThanOrEqualContext,
   ListContext,
   LocalDecContext,
+  LocalDecsContext,
   MergeContext,
   ModuloContext,
   MultiplicationContext,
@@ -545,6 +546,21 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
         }
       }
     ]
+  }
+  visitLocalDecs(ctx: LocalDecsContext) : es.VariableDeclarator[] {
+    const localDecs : es.VariableDeclarator[] = this.visitSeqDec(ctx._localDecs)
+    const decs : es.VariableDeclarator[] = this.visitSeqDec(ctx._decs)
+    if (decs.length > 0) {
+      decs[0]['locals'] = {
+        decs: {
+          type: 'VariableDeclaration',
+          declarations: localDecs,
+          kind: 'const'
+        },
+        arity: decs.length 
+      }
+    }
+    return decs 
   }
   visitSeqDec(ctx: SeqDeclContext): es.VariableDeclarator[] {
     const ctxs = ctx.declaration()

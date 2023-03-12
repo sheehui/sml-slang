@@ -29,6 +29,7 @@ ELSE: 'else';
 THEN: 'then'; 
 VAL: 'val'; 
 LET: 'let'; 
+LOCAL: 'local'; 
 IN: 'in'; 
 END: 'end'; 
 FUN: 'fun';
@@ -107,6 +108,7 @@ seqDecl
 declaration
    : VAL REC?  identifier=ID EQUAL value=expression                     # VarDec
    | FUN identifier=ID params=pattern EQUAL value=expression      # FunDec
+   | LOCAL localDecs=seqDecl IN decs=seqDecl END                  # LocalDecs
    ;
 
 pattern
