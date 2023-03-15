@@ -118,7 +118,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return {
       tag, 
       elems,
-      node
+      node,
+      loc: node.loc
     }
   },
 
@@ -461,8 +462,8 @@ const microcode : { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  list_append: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
-    !cmd.isCheck && A.push({ tag: 'list_append_i', len: cmd.elems.length })
+  list_append: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression, loc: es.SourceLocation }) => {
+    !cmd.isCheck && A.push({ tag: 'list_append_i', loc: cmd.loc })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
       A.push(x)
@@ -544,76 +545,80 @@ const microcode : { [tag: string]: Function } = {
       list.push(elem.value)
     }
 
-    S.push(rttc.getTypedList(first, list))
+    S.push(rttc.getDeclaredTypedList(first, list))
   },
   list_merge_i: (cmd: { len: number, node: es.ArrayExpression }) => {
-    const list = []
+    // const list = []
 
-    let first = undefined
-    //TODO: check both is list + same type
-    for (let i = 0; i < cmd.len; i++) {
-      const elem = S.pop()
+    // let first = undefined
+    // //TODO: check both is list + same type
+    // for (let i = 0; i < cmd.len; i++) {
+    //   const elem = S.pop()
 
-      if (elem.value.length === 0) {
-        continue
-      }
+    //   if (elem.value.length === 0) {
+    //     continue
+    //   }
 
-      if (first === undefined) {
-        first = elem.value[0]
-      }
+    //   if (first === undefined) {
+    //     first = elem.value[0]
+    //   }
 
-      if (!rttc.isTypeEqual(first, elem)) {
-        throw new rttc.TypeError(cmd.node, ' as list element to merge @', first, elem)
-      }
+    //   if (!rttc.isTypeEqual(first, elem)) {
+    //     throw new rttc.TypeError(cmd.node, ' as list element to merge @', first, elem)
+    //   }
 
-      list.push(...elem.value)
-    }
+    //   list.push(...elem.value)
+    // }
     
-    S.push(rttc.getTypedList(first, list))
+    // S.push(rttc.getTypedList(first, list))
   },
-  list_append_i: (cmd: { len: number, node: es.ArrayExpression }) => {
-    const temp = []
-    let result = undefined
+  list_append_i: (cmd: { node: es.ArrayExpression, loc: es.SourceLocation }) => {
+    const left = S.pop() 
+    const right = S.pop()
+    const result = binaryOp('::', left, right, cmd.loc)
+    S.push(rttc.getAppendedTypedList(left, right, result))
+    // const temp = []
+    // let result = undefined
 
-    let first = undefined
-    //TODO: check all are same type
-    for (let i = 0; i < cmd.len; i++) {
-      temp.push(S.pop())
-    }
+    // let first = undefined
+    // //TODO: check all are same type
+    // for (let i = 0; i < cmd.len; i++) {
+    //   temp.push(S.pop())
+    // }
 
-    for (let i = cmd.len - 1; i >= 0; i--) {
-      const elem = temp[i]
+    // for (let i = cmd.len - 1; i >= 0; i--) {
+    //   const elem = temp[i]
 
-      if (result === undefined) {
-        if (elem.type !== 'list') {
-          throw new rttc.TypeError(cmd.node, " at the end of stmt", 'list', elem)
-        }
+    //   if (result === undefined) {
+    //     if (elem.type !== 'list') {
+    //       throw new rttc.TypeError(cmd.node, " at the end of stmt", 'list', elem)
+    //     }
 
-        if (elem.value.length !== 0) {
-          first = elem.value[0] // assign any elem
-        }
+    //     if (elem.value.length !== 0) {
+    //       first = elem.value[0] // assign any elem
+    //     }
 
-        result = elem.value
+    //     result = elem.value
 
-        continue
-      }
+    //     continue
+    //   }
 
-      if (first === undefined) {
-        result.push(elem.value)
-        if (elem.value.length !== 0) {
-          first = elem
-        }
-        continue
-      }
+    //   if (first === undefined) {
+    //     result.push(elem.value)
+    //     if (elem.value.length !== 0) {
+    //       first = elem
+    //     }
+    //     continue
+    //   }
 
-      if (!rttc.isTypeEqual(first, elem)) {
-        throw new rttc.TypeError(cmd.node, ' as list element to append ::', first, elem)
-      }
+    //   if (!rttc.isTypeEqual(first, elem)) {
+    //     throw new rttc.TypeError(cmd.node, ' as list element to append ::', first, elem)
+    //   }
 
-      result.push(elem.value)
-    }
+    //   result.push(elem.value)
+    // }
     
-    S.push(rttc.getTypedList(first, result.reverse()))
+    // S.push(rttc.getTypedList(first, result.reverse()))
   },
   tuple_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const tuple = []

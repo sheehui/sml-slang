@@ -292,6 +292,13 @@ describe('binop', () => {
  * LIST INSTANTIATION
  */
 describe('list creation with []', () => {
+  test('nested empty lists', () => {
+    const code: string = '[[[]]];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[[]]])
+    })
+  })
+
   test('literals of same types', () => {
     const code: string = '[1, 2, 3];'
     return runInContext(code, context, options).then(data => {

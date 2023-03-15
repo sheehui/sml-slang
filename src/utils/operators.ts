@@ -152,7 +152,7 @@ export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
 }
 
 export function binaryOp(
-  operator: BinaryOperator,
+  operator: string,
   left: TypedValue,
   right: TypedValue,
   loc: SourceLocation
@@ -174,7 +174,12 @@ export function binaryOp(
   }
 }
 
-export function evaluateBinaryExpression(operator: BinaryOperator, left: any, right: any) {
+const executeAppend = (left: any, right: any) => {
+  // RHS guaranteed to be a list
+  return [left].concat(right) // Append is right associative
+}
+
+export function evaluateBinaryExpression(operator: any, left: any, right: any) {
   const l = left.value
   const r = right.value
   switch (operator) {
@@ -201,6 +206,8 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
       return l > r
     case '>=':
       return l >= r
+    case '::':
+      return executeAppend(l, r)
     default:
       return Error("Invalid binary operator " + operator)
   }

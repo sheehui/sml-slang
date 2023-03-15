@@ -45,8 +45,9 @@ const isNil = (v: Value) => typeOf(v) === 'null'
 const isTypedNumber = (v: TypedValue) => v.type === 'int'
 const isTypedString = (v: TypedValue) => v.type === 'string'
 const isTypedBool = (v: TypedValue) => v.type === 'boolean'
-const isTypedList = (v: TypedValue) => v.type === 'list'
-const isTypedTuple = (v: TypedValue) => v.type === 'tuple'
+const isTypedList = (v: TypedValue) => v.type === 'list' && Array.isArray(v.value) && v.typeArr
+const isFreeList = (v: TypedValue) => isTypedList(v) && v.typeArr![0] === '\'a'
+const isTypedTuple = (v: TypedValue) => v.type === 'tuple' && Array.isArray(v.value) && v.typeArr
 const isListOrTuple = (v: TypedValue) => isTypedList(v) || isTypedTuple(v)
 
 
@@ -109,13 +110,45 @@ const typeArrToString = (arr: SmlType[]) => {
   }
 }
 
-export const getTypedList = (first: undefined | TypedValue, val: any) => {
+
+export const getDeclaredTypedList = (first: TypedValue | undefined, val: any) : TypedValue => {
   if (first === undefined) {
-    return { type: 'list', typeArr: [], value: val }
+    return {
+      type: 'list',
+      typeArr: ['\'a', 'list'],
+      value: []
+    }
   } else {
-    const listType = isListOrTuple(first) ? first.typeArr! : [first.type]
-    listType.push('list')
-    return { type: 'list', typeArr: listType, value: val }
+    const typeArr = isListOrTuple(first) ? first.typeArr! : [first.type]
+    typeArr.push('list')
+
+    return {
+      type: 'list',
+      typeArr: typeArr,
+      value: val
+    }
+  }
+}
+
+export const getAppendedTypedList = (left: TypedValue, right: TypedValue, val: any) : TypedValue => {
+  const typeArr = right.typeArr!
+
+  if (isFreeList(right)) {
+    typeArr.push('list') // free list
+
+    if (!isFreeList(left)) { // assign a fixed type
+      typeArr[0] = isTypedList(left) ? left.typeArr![0] : left.type
+    }
+
+    if (!isTypedList(left)) {
+      typeArr.pop()
+    }
+  }
+
+  return {
+    type: 'list',
+    typeArr: typeArr,
+    value: val
   }
 }
 
@@ -127,7 +160,11 @@ export const getTypedLiteral = (val: any): TypedValue => {
   } else if (isNumber(val)) {
     return { type: 'int', value: val }
   } else if (isNil(val)) {
-    return { type: 'list', typeArr: [], value: [] }
+    return {
+      type: 'list',
+      typeArr: ['\'a', 'list'],
+      value: []
+    }
   } else {
     throw Error('Unexpected literal to type')
   }
@@ -180,9 +217,41 @@ export const checkUnaryExpression = (
   }
 }
 
+const isTypeArrEqual = (
+  expected: Array<SmlType>,
+  got: Array<SmlType>
+) => {
+  return expected.toString() === got.toString()
+}
+
+const checkAppendExpression = (
+  node: es.Node,
+  left: TypedValue,
+  right: TypedValue
+) => {
+  if (!isTypedList(right)) { // right side needs to be some list
+    return new TypeError(node, RHS, 'list', right)
+  }
+
+  if (isFreeList(right)) { // skip type checking
+    return
+  }
+
+  // For valid ::, LHS type must match elem type of list in RHS
+  const rightTypeArr : Array<SmlType> = right.typeArr!
+  const expectedTypeArr : Array<SmlType> = rightTypeArr.slice(0, rightTypeArr.length - 1)
+  const gotTypeArr : Array<SmlType> = isListOrTuple(left) ? left.typeArr! : [left.type]
+
+  if (!isTypeArrEqual(gotTypeArr, expectedTypeArr)) {
+    return new TypeError(node, LHS, typeArrToString(expectedTypeArr), typeArrToString(gotTypeArr))
+  }
+
+  return
+}
+
 export const checkBinaryExpression = (
   node: es.Node,
-  operator: es.BinaryOperator,
+  operator: string,
   left: TypedValue,
   right: TypedValue
 ) => {
@@ -221,6 +290,8 @@ export const checkBinaryExpression = (
     case '!==':
     case '===':
       return
+    case '::':
+      return checkAppendExpression(node, left, right)
     default:
       return
   }
