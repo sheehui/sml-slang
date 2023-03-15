@@ -533,6 +533,7 @@ const microcode : { [tag: string]: Function } = {
     for (let i = 0; i < cmd.len; i++) {
       const elem : TypedValue = S.pop()
 
+      // TODO: account for free lists
       if (first == undefined) {
         first = elem
       }

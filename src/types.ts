@@ -256,7 +256,7 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
-export type SmlType = 'boolean' | 'null' | 'int' | 'string' | 'undefined' | 'list' | 'tuple' | '\'a'
+export type SmlType = 'boolean' | 'int' | 'string' | 'list' | 'tuple' | '\'a'
 
 export type SmlValue = string | number | boolean
 

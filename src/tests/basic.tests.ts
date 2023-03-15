@@ -326,6 +326,13 @@ describe('list creation with []', () => {
       expect(error.explain()).toMatch("Expected int list as list element, got string list")
     })
   })
+
+  test('free list of different levels of nesting', () => {
+    const code: string = '[[[[]]], [], [[]]];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[[[]]], [], [[]]])
+    })
+  })
 })
 
 /**
