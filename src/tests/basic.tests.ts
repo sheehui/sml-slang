@@ -329,6 +329,75 @@ describe('list creation with []', () => {
 })
 
 /**
+ * LIST ::
+ */
+describe('list creation with ::', () => {
+  test('simple list with only literals, ends with nil', () => {
+    const code: string = '1::2::3::4::5::nil;'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([1,2,3,4,5])
+    })
+  })
+
+  test('simple list with only literals, ends with list', () => {
+    const code: string = '1::2::3::[4,5];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([1,2,3,4,5])
+    })
+  })
+
+  test('RHS is not nil or list', () => {
+    const code: string = '4::5;'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch("Expected list on right hand side of operation, got int.")
+    })
+  })
+
+  test('list of different types', () => {
+    const code: string = '1::true::5::nil;'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch("Expected int on left hand side of operation, got boolean.")
+    })
+  })
+
+  test('nested list creation with ::', () => {
+    const code: string = '(1::3::nil)::[5::[7]];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[1,3],[5,7]])
+    })
+  })
+
+  test('operator precedence maintains', () => {
+    const code: string = '(true::1+2=2::nil)::[2 + 3 > 6]::[[true]];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[true, false], [false], [true]])
+    })
+  })
+
+  test('nil chain', () => {
+    const code: string = 'nil::nil::nil::nil;'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[], [], []])
+    })
+  })
+
+  test('nil with free list', () => {
+    const code: string = '[[]]::nil;'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[[]]])
+    })
+  })
+
+  test('free list of different levels of nesting', () => {
+    const code: string = '[[[]]]::[]::[[]]::nil;'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[[[]]], [], [[]]])
+    })
+  })
+})
+
+
+/**
  * FUNCTION DECLARATIONS
  */
 describe('fun declaration', () => {
