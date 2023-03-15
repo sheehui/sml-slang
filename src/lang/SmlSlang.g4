@@ -29,14 +29,18 @@ ELSE: 'else';
 THEN: 'then'; 
 VAL: 'val'; 
 LET: 'let'; 
+LOCAL: 'local'; 
 IN: 'in'; 
 END: 'end'; 
 FUN: 'fun';
+FN: 'fn'; 
+LAMARR: '=>'; 
 WHILE: 'while';
 DO: 'do';
 SEMIC: ';'; 
 WILDC: '_'; 
 NIL: 'nil'; 
+REC: 'rec'; 
 NUMBER: DIGIT+;
 TUPLE_ACCESS: HASH [1-9] DIGIT*;
 STRING: '"' (~["])+ '"';
@@ -62,7 +66,8 @@ expression
    | BOOLEAN                                                      # Boolean
    | NIL                                                          # Nil
 
-   | callee=ID '(' ( expression ( ',' expression )* )? ')'        # FuncApp
+   | FN params=pattern LAMARR (expression)                          # FuncExpr
+   | callee=expression '(' ( expression ( ',' expression )* )? ')'        # FuncApp
    | '(' inner=expression ')'                                     # Parentheses
    | '(' ( expression ( ',' expression )* )? ')'                  # Tuple
    | record=TUPLE_ACCESS expr=expression                          # TupleAccess
@@ -101,8 +106,9 @@ seqDecl
    ;
 
 declaration
-   : VAL identifier=ID EQUAL value=expression                     # VarDec
+   : VAL REC?  identifier=ID EQUAL value=expression                     # VarDec
    | FUN identifier=ID params=pattern EQUAL value=expression      # FunDec
+   | LOCAL localDecs=seqDecl IN decs=seqDecl END                  # LocalDecs
    ;
 
 pattern

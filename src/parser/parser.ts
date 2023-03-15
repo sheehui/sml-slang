@@ -17,6 +17,7 @@ import {
   EqualContext,
   ExpressionContext,
   FuncAppContext,
+  FuncExprContext,
   FunDecContext,
   GreaterThanContext,
   GreaterThanOrEqualContext,
@@ -25,6 +26,7 @@ import {
   LessThanOrEqualContext,
   ListContext,
   LocalDecContext,
+  LocalDecsContext,
   MergeContext,
   ModuloContext,
   MultiplicationContext,
@@ -418,19 +420,37 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   }
 
   visitFuncApp(ctx: FuncAppContext) : es.Expression {
+    const callee : es.Expression = this.visit(ctx._callee); 
+    if (!['Identifier', 'FunctionExpression'].includes(callee.type)) {
+      throw Error(`Cannot apply to a ${callee.type}`)
+    }
     const exprs = ctx.expression() 
     const args = []
-    for (let i = 0; i < exprs.length; i++) {
+    for (let i = 1; i < exprs.length; i++) { // skip the first expr as its the callee 
       args.push(exprs[i].accept(this))
     }
     return {
       type: 'CallExpression', 
-      callee: {
-        type: 'Identifier',
-        name: ctx.ID().text
-      },
+      callee,
       arguments: args,
       optional: false // not sure what this does yet 
+    }
+  }
+
+  visitFuncExpr(ctx: FuncExprContext) : es.Expression {
+    return {
+      type: 'FunctionExpression',
+      id: null,
+      params: new PatternGenerator().visit(ctx._params),
+      body: {
+        type: 'BlockStatement',
+        body: [
+          {
+            type: 'ExpressionStatement',
+            expression: new ExpressionGenerator().visit(ctx.expression()!)
+          }
+        ]
+      }
     }
   }
 
@@ -481,14 +501,22 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
 
 class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
+    const init = new ExpressionGenerator().visit(ctx._value) // variable value
+    const id : es.Identifier = {
+      type: 'Identifier',
+      name: ctx._identifier.text! // '!' is a non-null assertion operator
+    }
+
+    if (ctx.REC() && init.type === 'FunctionExpression') { // 'rec' can only be specified for lambdas 
+      // set id on lambda so that var name can be bound within the func block
+      // var dec will basically behave like a 'fun' dec 
+      init.id = id 
+    }
     return [
       {
         type: 'VariableDeclarator',
-        id: {
-          type: 'Identifier',
-          name: ctx._identifier.text! // '!' is a non-null assertion operator
-        },
-        init: new ExpressionGenerator().visit(ctx._value)
+        id,
+        init
       }
     ]
   }
@@ -518,6 +546,24 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
         }
       }
     ]
+  }
+  visitLocalDecs(ctx: LocalDecsContext) : es.VariableDeclarator[] {
+    const localDecs : es.VariableDeclarator[] = this.visitSeqDec(ctx._localDecs)
+    const decs : es.VariableDeclarator[] = this.visitSeqDec(ctx._decs)
+    if (decs.length > 0) {
+      // to handle nested local (i.e. if decs has its own 'locals' field)
+      const prevDecs : es.VariableDeclarator[] = decs[0]['locals'] ? decs[0]['locals'].decs.declarations : []
+      
+      decs[0]['locals'] = {
+        decs: {
+          type: 'VariableDeclaration',
+          declarations: localDecs.concat(prevDecs),
+          kind: 'const'
+        },
+        arity: decs.length 
+      }
+    }
+    return decs 
   }
   visitSeqDec(ctx: SeqDeclContext): es.VariableDeclarator[] {
     const ctxs = ctx.declaration()

@@ -3,7 +3,7 @@ import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { Context, Environment, Value } from '../types'
+import { Context, Environment, TypedValue, Value } from '../types'
 import { Stack } from '../types'
 import { binaryOp, unaryOp } from '../utils/operators'
 import * as rttc from '../utils/rttc'
@@ -117,7 +117,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     return {
       tag, 
-      elems
+      elems,
+      node
     }
   },
 
@@ -129,7 +130,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     return {
       tag: 'lam', 
       params,
-      body: yield* evaluators[node.body.type](node.body, context)
+      body: yield* evaluators[node.body.type](node.body, context),
+      id: node.id ? yield* evaluators[node.id.type](node.id, context) : node.id
     }
   },
 
@@ -212,15 +214,31 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     // const decl = node.declarations[0]
     // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
     const ids = [] 
-    const exprs = [] 
-    for (const decl of node.declarations) {
+    const exprs = []
+    let localStartIdx = null 
+    let localDecs = null 
+    let localArity = null 
+
+    for (let i = 0; i < node.declarations.length; i++) {
+      const decl = node.declarations[i]
       ids.push(decl.id.type === "Identifier" ? decl.id.name : null) // assume that vars are declared with identifier only
+
+      // deal with local declarations
+      const locals = (decl as any).locals 
+      if (locals) {
+        localStartIdx = i
+        localDecs = yield* evaluators[locals.decs.type](locals.decs, context)
+        localArity = locals.arity 
+      }
       exprs.push(yield* evaluators[decl.init!.type](decl.init!, context))
     }
     return {
       tag: 'var',
       ids, 
-      exprs
+      exprs,
+      localStartIdx,
+      localDecs,
+      localArity
     }
   },
 
@@ -306,11 +324,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 }
 
 const microcode : { [tag: string]: Function } = {
-  blk: (cmd: { body: any }) => {
+  blk: (cmd: { body: any, isCheck: boolean }) => {
     if (A.size() > 0) {
       A.push({tag: 'env_i', env: E}) 
     }
     const body = cmd.body 
+    body['isCheck'] = cmd.isCheck
     A.push(body)
 
     // extend environment by 1 frame for block 
@@ -321,167 +340,303 @@ const microcode : { [tag: string]: Function } = {
       name: 'program'
     }
   }, 
-  seq: (cmd: { body: any[] }) => {
+  seq: (cmd: { body: any[], isCheck: boolean }) => {
     for (let i = cmd.body.length - 1; i >= 0; i--) {
       const expr = cmd.body[i]
+      expr["isCheck"] = cmd.isCheck
       A.push(expr)
     }
   },
-  lit: (cmd: { val: any }) => {
-    S.push(cmd.val)
+  lit: (cmd: { val: any, isCheck: boolean }) => {
+    if (!cmd.isCheck) { 
+      return S.push(rttc.getTypedLiteral(cmd.val)) 
+    }
   },
-  id: (cmd: { sym: string }) => {
+  id: (cmd: { sym: string, isCheck: boolean }) => {
     let env: Environment | null = E 
     while (env) {
       const frame = env.head 
       if (frame.hasOwnProperty(cmd.sym)) {
-        return S.push(frame[cmd.sym])
+        return !cmd.isCheck && S.push(frame[cmd.sym])
       }
       env = env.tail 
     }
-    console.log("error: cannot find variable in env") 
+    throw Error(`Unbound variable ${cmd.sym}`) 
   },
-  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; loc: es.SourceLocation }) => {
-    A.push({
-      tag: 'binop_i', 
-      sym: cmd.sym,
-      loc: cmd.loc
-    })
+  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; loc: es.SourceLocation, isCheck: boolean }) => {
+    if (!cmd.isCheck) {
+      A.push({
+        tag: 'binop_i', 
+        sym: cmd.sym,
+        loc: cmd.loc
+      })
+    }
+    cmd.frst['isCheck'] = cmd.isCheck 
+    cmd.scnd['isCheck'] = cmd.isCheck 
     A.push(cmd.frst)
     A.push(cmd.scnd)
   }, 
-  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation }) => {
-    A.push({
-      tag: 'unop_i',
-      sym: cmd.sym,
-      loc: cmd.loc
-    })
+  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation, isCheck: boolean }) => {
+    if (!cmd.isCheck) {
+      A.push({
+        tag: 'unop_i',
+        sym: cmd.sym,
+        loc: cmd.loc
+      })
+    }
+    cmd.arg['isCheck'] = cmd.isCheck 
     A.push(cmd.arg)
   }, 
-  var: (cmd: { ids: string[], exprs: any[] }) => {
+  var: (cmd: { ids: string[], exprs: any[], localStartIdx: number, localArity: number, localDecs: any, isCheck: boolean }) => {
     // A.push({ tag: 'lit', val: undefined })
     // A.push({ tag: 'pop_i'})
     for (let i = cmd.exprs.length - 1; i >= 0; i--) {
-      A.push({ tag: 'assmt', sym: cmd.ids[i], expr: cmd.exprs[i] })
+      if (cmd.localStartIdx !== null && i === cmd.localStartIdx + cmd.localArity - 1) {
+        // restores the original env after 'local...in...end' is evaluated 
+        A.push({ tag: 'env_i', env: E })
+      }
+
+      A.push({ tag: 'assmt', 
+        sym: cmd.ids[i], 
+        expr: cmd.exprs[i], 
+        // frameOffset to skip the temp frame (if declaration is within 'local...in<HERE>end')
+        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0, 
+        isCheck: cmd.isCheck
+      })
+      
+      if (cmd.localStartIdx !== null && i === cmd.localStartIdx) {
+        // extend current env to temporarily store local declarations (i.e. 'local<THESE>in...end')
+        // extended env will be used to eval declarations within 'local...in<HERE>end' only
+        A.push(cmd.localDecs)
+        A.push({ tag: 'env_i', env: {
+          head: {}, 
+          tail: E, 
+          id: E.id,  
+          name: 'program'
+        }})
+      }
     }
-    // A.push({ tag: 'assmt', sym: cmd.id, expr: cmd.expr })
   },
-  assmt: (cmd: { sym: string, expr: any }) => {
-    A.push({ tag: 'assmt_i', sym: cmd.sym }) 
+  assmt: (cmd: { sym: string, expr: any, frameOffset: number, isCheck: boolean }) => {
+    A.push({ tag: 'assmt_i', sym: cmd.sym, frameOffset: cmd.frameOffset }) 
+    cmd.expr['isCheck'] = cmd.isCheck
     A.push(cmd.expr) 
   }, 
-  lam: (cmd: { params: any[], body: es.BlockStatement }) => {
-    S.push({ tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: E})
+  lam: (cmd: { params: any[], body: es.BlockStatement, id: any }) => {
+    A.push({ tag: 'closure_i', params: cmd.params.map(param => param.sym), body: cmd.body, env: E })
+
+    // check vars within function 
+    if (A.size() > 0) {
+      A.push({tag: 'env_i', env: E}) 
+    }
+    
+    const body = {...cmd.body, isCheck: true }
+    A.push(body)
+    
+    // extend environment by 1 frame for block 
+    const head = {} 
+    cmd.params.forEach(param => head[param.sym] = null) 
+    if (cmd.id) { // allows recursive functions (for 'fun' declarations only)
+      head[cmd.id.sym] = null 
+    }
+    E = {
+      head, 
+      tail: E, 
+      id: E.id,  
+      name: 'program'
+    }
+    
   },
-  list_lit: (cmd: { elems: any[] }) => {
-    A.push({ tag: 'list_lit_i', len: cmd.elems.length })
+  list_lit: (cmd: { elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+    !cmd.isCheck && A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node })
     cmd.elems.forEach(x => {
+      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  list_merge: (cmd: { elems: any[] }) => {
-    A.push({ tag: 'list_merge_i', len: cmd.elems.length })
+  list_merge: (cmd: { elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+    !cmd.isCheck && A.push({ tag: 'list_merge_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
+      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  list_append: (cmd: {elems: any[]}) => {
-    A.push({ tag: 'list_append_i', len: cmd.elems.length })
+  list_append: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+    !cmd.isCheck && A.push({ tag: 'list_append_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
+      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  tuple_lit: (cmd: {elems: any[]}) => {
-    A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
+  tuple_lit: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+    !cmd.isCheck && A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
+      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  record: (cmd: {record: any, expr: any}) => {
+  record: (cmd: {record: any, expr: any, isCheck: boolean}) => {
     const index = cmd.record.value - 1 // input is 1-indexed
-    A.push({tag: 'record_i', index})
+    !cmd.isCheck && A.push({tag: 'record_i', index})
 
     if (cmd.expr.tag === 'tuple_lit') {
+      cmd.expr['isCheck'] = cmd.isCheck 
       A.push(cmd.expr)
     }
 
     if (cmd.expr.type === 'Identifier') {
-      A.push({tag: 'id', sym: cmd.expr.name})
+      A.push({tag: 'id', sym: cmd.expr.name, isCheck: cmd.isCheck})
     }
   },
-  app: (cmd: { args: any[], fun: any }) => {
-    A.push({ tag: 'app_i', arity: cmd.args.length })
+  app: (cmd: { args: any[], fun: any, isCheck: boolean }) => {
+    if (!cmd.isCheck) {
+      A.push({ tag: 'app_i', arity: cmd.args.length })
+    }
     for (let i = 0; i < cmd.args.length; i++) {
+      cmd.args[i]['isCheck'] = cmd.isCheck
       A.push(cmd.args[i]) 
     }
+    cmd.fun['isCheck'] = cmd.isCheck
     A.push(cmd.fun)
   },
-  cond_expr: (cmd: { pred: any, cons: any, alt: any, node: es.ConditionalExpression }) => {
-    A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node })
+  cond_expr: (cmd: { pred: any, cons: any, alt: any, node: es.ConditionalExpression, isCheck: boolean }) => {
+    A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
+    cmd.pred["isCheck"] = cmd.isCheck
     A.push(cmd.pred)
   }, 
   binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
     const right = S.pop() 
     const left = S.pop()
-    S.push(binaryOp(cmd.sym, left, right, cmd.loc))
+    const result = binaryOp(cmd.sym, left, right, cmd.loc)
+    S.push(rttc.getTypedLiteral(result))
     // S.push(evaluateBinaryExpression(cmd.sym, left, right))
   },
   unop_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
     const arg = S.pop()
-    S.push(unaryOp(cmd.sym, arg, cmd.loc))
+    const result = unaryOp(cmd.sym, arg, cmd.loc)
+    S.push(rttc.getTypedLiteral(result))
     // S.push(evaluateUnaryExpression(cmd.sym, arg))
   },
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env 
   },
-  assmt_i: (cmd: { sym: string }) => {
+  assmt_i: (cmd: { sym: string, frameOffset: number }) => {
+    if (cmd.frameOffset && E.tail) {
+      return E.tail.head[cmd.sym] = S.peek() 
+    } 
     E.head[cmd.sym] = S.peek() 
   },
-  list_lit_i: (cmd: { len: number }) => {
+  list_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const list = []
     // TODO: type checking
+    let first = undefined
     for (let i = 0; i < cmd.len; i++) {
-      list.push(S.pop())
+      const elem : TypedValue = S.pop()
+
+      if (first == undefined) {
+        first = elem
+      }
+
+      if (!rttc.isTypeEqual(first, elem)) {
+        throw new rttc.TypeError(cmd.node, ' as list element', first, elem)
+      }
+
+      list.push(elem.value)
     }
-    S.push(list)
+
+    S.push(rttc.getTypedList(first, list))
   },
-  list_merge_i: (cmd: { len: number }) => {
+  list_merge_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const list = []
 
-    //TODO: check both is list + same type1::
-    for (let i = 0; i < cmd.len; i++) {
-      list.push(...S.pop())
-    }
-    
-    S.push(list)
-  },
-  list_append_i: (cmd: { len: number }) => {
-    const list = []
-
-    //TODO: check all are same type
+    let first = undefined
+    //TODO: check both is list + same type
     for (let i = 0; i < cmd.len; i++) {
       const elem = S.pop()
-      // TODO: peek terminal node == null, unwrap second last node accordingly
-      list.push(elem)
+
+      if (elem.value.length === 0) {
+        continue
+      }
+
+      if (first === undefined) {
+        first = elem.value[0]
+      }
+
+      if (!rttc.isTypeEqual(first, elem)) {
+        throw new rttc.TypeError(cmd.node, ' as list element to merge @', first, elem)
+      }
+
+      list.push(...elem.value)
     }
     
-    S.push(list)
+    S.push(rttc.getTypedList(first, list))
   },
-  tuple_lit_i: (cmd: { len: number }) => {
-    const list = []
+  list_append_i: (cmd: { len: number, node: es.ArrayExpression }) => {
+    const temp = []
+    let result = undefined
+
+    let first = undefined
+    //TODO: check all are same type
     for (let i = 0; i < cmd.len; i++) {
-      list.push(S.pop())
+      temp.push(S.pop())
     }
-    S.push(list)
+
+    for (let i = cmd.len - 1; i >= 0; i--) {
+      const elem = temp[i]
+
+      if (result === undefined) {
+        if (elem.type !== 'list') {
+          throw new rttc.TypeError(cmd.node, " at the end of stmt", 'list', elem)
+        }
+
+        if (elem.value.length !== 0) {
+          first = elem.value[0] // assign any elem
+        }
+
+        result = elem.value
+
+        continue
+      }
+
+      if (first === undefined) {
+        result.push(elem.value)
+        if (elem.value.length !== 0) {
+          first = elem
+        }
+        continue
+      }
+
+      if (!rttc.isTypeEqual(first, elem)) {
+        throw new rttc.TypeError(cmd.node, ' as list element to append ::', first, elem)
+      }
+
+      result.push(elem.value)
+    }
+    
+    S.push(rttc.getTypedList(first, result.reverse()))
+  },
+  tuple_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
+    const tuple = []
+    const type = []
+    for (let i = 0; i < cmd.len; i++) {
+      const elem = S.pop()
+      tuple.push(elem.value)
+      type.push(rttc.getElemType(elem))
+    }
+    S.push({type: 'tuple', typeArr: type, value: tuple})
   },
   record_i: (cmd : { index: number }) => {
     const tuple = S.pop()
 
-    if (cmd.index < 0 || cmd.index >= tuple.length) {
+    if (tuple.type !== 'tuple') {
+      throw Error("# can only be used on tuples")
+    }
+
+    if (cmd.index < 0 || cmd.index >= tuple.value.length) {
       throw Error("index out of bounds")
     }
 
-    S.push(tuple[cmd.index])
+    S.push(rttc.getTypedTupleElem(tuple, cmd.index))
   },
   app_i: (cmd: { arity: number }) => {
     const args = []
@@ -506,13 +661,25 @@ const microcode : { [tag: string]: Function } = {
       name: 'program'
     }
   },
-  branch_i: (cmd: { cons: any, alt: any, node: es.ConditionalExpression }) => {
+  branch_i: (cmd: { cons: any, alt: any, node: es.ConditionalExpression, isCheck: boolean }) => {
+    if (cmd.isCheck) {
+      const checkCons = {...cmd.cons, isCheck: cmd.isCheck}
+      const checkAlt = {...cmd.alt, isCheck: cmd.isCheck}
+      A.push(checkCons)
+      A.push(checkAlt) 
+      return
+    }
+
     const pred = S.pop() 
     const error = rttc.checkIfStatement(cmd.node, pred)
     if (error) {
       throw error
     }
-    A.push(pred ? cmd.cons : cmd.alt) 
+    
+    A.push(pred.value ? cmd.cons : cmd.alt) 
+  },
+  closure_i: (cmd: { params: any[], body: any, env: Environment }) => {
+    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env})
   }
 }
 // tslint:enable:object-literal-shorthand
@@ -547,5 +714,6 @@ export function* evaluate(node: es.Node, context: Context) : any{
   yield* leave(context)
   console.log("\n=====EXIT EVALUATION=====\n")
   const r = S.pop(); 
-  return r
+  console.log(r)
+  return r.value
 }

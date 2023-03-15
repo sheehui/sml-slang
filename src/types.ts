@@ -256,6 +256,16 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
+export type SmlType = 'boolean' | 'null' | 'int' | 'string' | 'undefined' | 'list' | 'tuple' 
+
+export type SmlValue = string | number | boolean
+
+export interface TypedValue {
+  type: SmlType
+  typeArr?: Array<SmlType>
+  value: SmlValue| Array<SmlValue>
+}
+
 export type TSAllowedTypes = 'any' | 'void'
 
 export const disallowedTypes = ['bigint', 'never', 'object', 'symbol', 'unknown'] as const
