@@ -529,7 +529,6 @@ const microcode : { [tag: string]: Function } = {
   },
   list_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const list = []
-    // TODO: type checking
     let first = undefined
     for (let i = 0; i < cmd.len; i++) {
       const elem : TypedValue = S.pop()
@@ -577,48 +576,6 @@ const microcode : { [tag: string]: Function } = {
     const right = S.pop()
     const result = binaryOp('::', left, right, cmd.loc)
     S.push(rttc.getAppendedTypedList(left, right, result))
-    // const temp = []
-    // let result = undefined
-
-    // let first = undefined
-    // //TODO: check all are same type
-    // for (let i = 0; i < cmd.len; i++) {
-    //   temp.push(S.pop())
-    // }
-
-    // for (let i = cmd.len - 1; i >= 0; i--) {
-    //   const elem = temp[i]
-
-    //   if (result === undefined) {
-    //     if (elem.type !== 'list') {
-    //       throw new rttc.TypeError(cmd.node, " at the end of stmt", 'list', elem)
-    //     }
-
-    //     if (elem.value.length !== 0) {
-    //       first = elem.value[0] // assign any elem
-    //     }
-
-    //     result = elem.value
-
-    //     continue
-    //   }
-
-    //   if (first === undefined) {
-    //     result.push(elem.value)
-    //     if (elem.value.length !== 0) {
-    //       first = elem
-    //     }
-    //     continue
-    //   }
-
-    //   if (!rttc.isTypeEqual(first, elem)) {
-    //     throw new rttc.TypeError(cmd.node, ' as list element to append ::', first, elem)
-    //   }
-
-    //   result.push(elem.value)
-    // }
-    
-    // S.push(rttc.getTypedList(first, result.reverse()))
   },
   tuple_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const tuple = []
