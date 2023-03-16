@@ -11,7 +11,7 @@ import * as rttc from '../utils/rttc'
 const step_limit = 1000000
 let A = new Stack<any>()
 let S = new Stack<Value>()
-let E = createGlobalEnvironment() 
+let E = createGlobalEnvironment()
 
 class Thunk {
   public value: Value
@@ -324,60 +324,66 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   
 }
 
-const microcode : { [tag: string]: Function } = {
-  blk: (cmd: { body: any, isCheck: boolean }) => {
+const microcode: { [tag: string]: Function } = {
+  blk: (cmd: { body: any; isCheck: boolean }) => {
     if (A.size() > 0) {
-      A.push({tag: 'env_i', env: E}) 
+      A.push({ tag: 'env_i', env: E })
     }
-    const body = cmd.body 
+    const body = cmd.body
     body['isCheck'] = cmd.isCheck
     A.push(body)
 
-    // extend environment by 1 frame for block 
+    // extend environment by 1 frame for block
     E = {
-      head: {}, 
-      tail: E, 
-      id: E.id,  
+      head: {},
+      tail: E,
+      id: E.id,
       name: 'program'
     }
-  }, 
-  seq: (cmd: { body: any[], isCheck: boolean }) => {
+  },
+  seq: (cmd: { body: any[]; isCheck: boolean }) => {
     for (let i = cmd.body.length - 1; i >= 0; i--) {
       const expr = cmd.body[i]
-      expr["isCheck"] = cmd.isCheck
+      expr['isCheck'] = cmd.isCheck
       A.push(expr)
     }
   },
-  lit: (cmd: { val: any, isCheck: boolean }) => {
-    if (!cmd.isCheck) { 
-      return S.push(rttc.getTypedLiteral(cmd.val)) 
+  lit: (cmd: { val: any; isCheck: boolean }) => {
+    if (!cmd.isCheck) {
+      return S.push(rttc.getTypedLiteral(cmd.val))
     }
   },
-  id: (cmd: { sym: string, isCheck: boolean }) => {
-    let env: Environment | null = E 
+  id: (cmd: { sym: string; isCheck: boolean }) => {
+    let env: Environment | null = E
     while (env) {
-      const frame = env.head 
+      const frame = env.head
       if (frame.hasOwnProperty(cmd.sym)) {
         return !cmd.isCheck && S.push(frame[cmd.sym])
       }
-      env = env.tail 
+      env = env.tail
     }
-    throw Error(`Unbound variable ${cmd.sym}`) 
+    throw Error(`Unbound variable ${cmd.sym}`)
   },
-  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; loc: es.SourceLocation, isCheck: boolean }) => {
+  binop: (cmd: {
+    sym: es.BinaryOperator
+    scnd: any
+    frst: any
+    loc: es.SourceLocation
+    isCheck: boolean
+  }) => {
     if (!cmd.isCheck) {
       A.push({
-        tag: 'binop_i', 
+        tag: 'binop_i',
         sym: cmd.sym,
         loc: cmd.loc
       })
     }
-    cmd.frst['isCheck'] = cmd.isCheck 
-    cmd.scnd['isCheck'] = cmd.isCheck 
+    cmd.frst['isCheck'] = cmd.isCheck
+    cmd.scnd['isCheck'] = cmd.isCheck
     A.push(cmd.frst)
     A.push(cmd.scnd)
-  }, 
-  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation, isCheck: boolean }) => {
+  },
+  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation; isCheck: boolean }) => {
     if (!cmd.isCheck) {
       A.push({
         tag: 'unop_i',
@@ -385,128 +391,150 @@ const microcode : { [tag: string]: Function } = {
         loc: cmd.loc
       })
     }
-    cmd.arg['isCheck'] = cmd.isCheck 
+    cmd.arg['isCheck'] = cmd.isCheck
     A.push(cmd.arg)
-  }, 
-  var: (cmd: { ids: string[], exprs: any[], localStartIdx: number, localArity: number, localDecs: any, isCheck: boolean }) => {
+  },
+  var: (cmd: {
+    ids: string[]
+    exprs: any[]
+    localStartIdx: number
+    localArity: number
+    localDecs: any
+    isCheck: boolean
+  }) => {
     // A.push({ tag: 'lit', val: undefined })
     // A.push({ tag: 'pop_i'})
     for (let i = cmd.exprs.length - 1; i >= 0; i--) {
       if (cmd.localStartIdx !== null && i === cmd.localStartIdx + cmd.localArity - 1) {
-        // restores the original env after 'local...in...end' is evaluated 
+        // restores the original env after 'local...in...end' is evaluated
         A.push({ tag: 'env_i', env: E })
       }
 
-      A.push({ tag: 'assmt', 
-        sym: cmd.ids[i], 
-        expr: cmd.exprs[i], 
+      A.push({
+        tag: 'assmt',
+        sym: cmd.ids[i],
+        expr: cmd.exprs[i],
         // frameOffset to skip the temp frame (if declaration is within 'local...in<HERE>end')
-        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0, 
+        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0,
         isCheck: cmd.isCheck
       })
-      
+
       if (cmd.localStartIdx !== null && i === cmd.localStartIdx) {
         // extend current env to temporarily store local declarations (i.e. 'local<THESE>in...end')
         // extended env will be used to eval declarations within 'local...in<HERE>end' only
         A.push(cmd.localDecs)
-        A.push({ tag: 'env_i', env: {
-          head: {}, 
-          tail: E, 
-          id: E.id,  
-          name: 'program'
-        }})
+        A.push({
+          tag: 'env_i',
+          env: {
+            head: {},
+            tail: E,
+            id: E.id,
+            name: 'program'
+          }
+        })
       }
     }
   },
-  assmt: (cmd: { sym: string, expr: any, frameOffset: number, isCheck: boolean }) => {
-    A.push({ tag: 'assmt_i', sym: cmd.sym, frameOffset: cmd.frameOffset }) 
+  assmt: (cmd: { sym: string; expr: any; frameOffset: number; isCheck: boolean }) => {
+    A.push({ tag: 'assmt_i', sym: cmd.sym, frameOffset: cmd.frameOffset })
     cmd.expr['isCheck'] = cmd.isCheck
-    A.push(cmd.expr) 
-  }, 
-  lam: (cmd: { params: any[], body: es.BlockStatement, id: any }) => {
+    A.push(cmd.expr)
+  },
+  lam: (cmd: { params: any[]; body: es.BlockStatement; id: any }) => {
     A.push({ tag: 'closure_i', params: cmd.params.map(param => param.sym), body: cmd.body, env: E })
 
-    // check vars within function 
+    // check vars within function
     if (A.size() > 0) {
-      A.push({tag: 'env_i', env: E}) 
+      A.push({ tag: 'env_i', env: E })
     }
-    
-    const body = {...cmd.body, isCheck: true }
+
+    const body = { ...cmd.body, isCheck: true }
     A.push(body)
-    
-    // extend environment by 1 frame for block 
-    const head = {} 
-    cmd.params.forEach(param => head[param.sym] = null) 
-    if (cmd.id) { // allows recursive functions (for 'fun' declarations only)
-      head[cmd.id.sym] = null 
+
+    // extend environment by 1 frame for block
+    const head = {}
+    cmd.params.forEach(param => (head[param.sym] = null))
+    if (cmd.id) {
+      // allows recursive functions (for 'fun' declarations only)
+      head[cmd.id.sym] = null
     }
     E = {
-      head, 
-      tail: E, 
-      id: E.id,  
+      head,
+      tail: E,
+      id: E.id,
       name: 'program'
     }
-    
   },
-  list_lit: (cmd: { elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+  list_lit: (cmd: { elems: any[]; isCheck: boolean; node: es.ArrayExpression }) => {
     !cmd.isCheck && A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  list_merge: (cmd: { elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+  list_merge: (cmd: { elems: any[]; isCheck: boolean; node: es.ArrayExpression }) => {
     !cmd.isCheck && A.push({ tag: 'list_merge_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  list_append: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression, loc: es.SourceLocation }) => {
+  list_append: (cmd: {
+    elems: any[]
+    isCheck: boolean
+    node: es.ArrayExpression
+    loc: es.SourceLocation
+  }) => {
     !cmd.isCheck && A.push({ tag: 'list_append_i', loc: cmd.loc })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  tuple_lit: (cmd: {elems: any[], isCheck: boolean, node: es.ArrayExpression }) => {
+  tuple_lit: (cmd: { elems: any[]; isCheck: boolean; node: es.ArrayExpression }) => {
     !cmd.isCheck && A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  record: (cmd: {record: any, expr: any, isCheck: boolean}) => {
+  record: (cmd: { record: any; expr: any; isCheck: boolean }) => {
     const index = cmd.record.value - 1 // input is 1-indexed
-    !cmd.isCheck && A.push({tag: 'record_i', index})
+    !cmd.isCheck && A.push({ tag: 'record_i', index })
 
     if (cmd.expr.tag === 'tuple_lit') {
-      cmd.expr['isCheck'] = cmd.isCheck 
+      cmd.expr['isCheck'] = cmd.isCheck
       A.push(cmd.expr)
     }
 
     if (cmd.expr.type === 'Identifier') {
-      A.push({tag: 'id', sym: cmd.expr.name, isCheck: cmd.isCheck})
+      A.push({ tag: 'id', sym: cmd.expr.name, isCheck: cmd.isCheck })
     }
   },
-  app: (cmd: { args: any[], fun: any, isCheck: boolean }) => {
+  app: (cmd: { args: any[]; fun: any; isCheck: boolean }) => {
     if (!cmd.isCheck) {
       A.push({ tag: 'app_i', arity: cmd.args.length })
     }
     for (let i = 0; i < cmd.args.length; i++) {
       cmd.args[i]['isCheck'] = cmd.isCheck
-      A.push(cmd.args[i]) 
+      A.push(cmd.args[i])
     }
     cmd.fun['isCheck'] = cmd.isCheck
     A.push(cmd.fun)
   },
-  cond_expr: (cmd: { pred: any, cons: any, alt: any, node: es.ConditionalExpression, isCheck: boolean }) => {
+  cond_expr: (cmd: {
+    pred: any
+    cons: any
+    alt: any
+    node: es.ConditionalExpression
+    isCheck: boolean
+  }) => {
     A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
-    cmd.pred["isCheck"] = cmd.isCheck
+    cmd.pred['isCheck'] = cmd.isCheck
     A.push(cmd.pred)
-  }, 
+  },
   binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
-    const right = S.pop() 
+    const right = S.pop()
     const left = S.pop()
     const result = binaryOp(cmd.sym, left, right, cmd.loc)
     S.push(rttc.getTypedLiteral(result))
@@ -517,19 +545,19 @@ const microcode : { [tag: string]: Function } = {
     S.push(rttc.getTypedLiteral(result))
   },
   env_i: (cmd: { env: Environment }) => {
-    E = cmd.env 
+    E = cmd.env
   },
-  assmt_i: (cmd: { sym: string, frameOffset: number }) => {
+  assmt_i: (cmd: { sym: string; frameOffset: number }) => {
     if (cmd.frameOffset && E.tail) {
-      return E.tail.head[cmd.sym] = S.peek() 
-    } 
-    E.head[cmd.sym] = S.peek() 
+      return (E.tail.head[cmd.sym] = S.peek())
+    }
+    E.head[cmd.sym] = S.peek()
   },
-  list_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
+  list_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const list = []
     let type = undefined
     for (let i = 0; i < cmd.len; i++) {
-      const elem : TypedValue = S.pop()
+      const elem: TypedValue = S.pop()
 
       // TODO: account for free lists
       if (type == undefined) {
@@ -543,38 +571,32 @@ const microcode : { [tag: string]: Function } = {
 
     S.push(rttc.getDeclaredTypedList(type, list))
   },
-  list_merge_i: (cmd: { node: es.ArrayExpression, loc: es.SourceLocation }) => {
+  list_merge_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     // const list = []
-
     // let first = undefined
     // //TODO: check both is list + same type
     // for (let i = 0; i < cmd.len; i++) {
     //   const elem = S.pop()
-
     //   if (elem.value.length === 0) {
     //     continue
     //   }
-
     //   if (first === undefined) {
     //     first = elem.value[0]
     //   }
-
     //   if (!rttc.isTypeEqual(first, elem)) {
     //     throw new rttc.TypeError(cmd.node, ' as list element to merge @', first, elem)
     //   }
-
     //   list.push(...elem.value)
     // }
-    
     // S.push(rttc.getTypedList(first, list))
   },
-  list_append_i: (cmd: { node: es.ArrayExpression, loc: es.SourceLocation }) => {
-    const left = S.pop() 
+  list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+    const left = S.pop()
     const right = S.pop()
     const result = binaryOp('::', left, right, cmd.loc)
     S.push(rttc.getAppendedTypedList(left, right, result))
   },
-  tuple_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
+  tuple_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const tuple = []
     const type = []
     for (let i = 0; i < cmd.len; i++) {
@@ -582,17 +604,17 @@ const microcode : { [tag: string]: Function } = {
       tuple.push(elem.value)
       type.push(rttc.getElemType(elem))
     }
-    S.push({type: 'tuple', typeArr: type, value: tuple})
+    S.push({ type: 'tuple', typeArr: type, value: tuple })
   },
-  record_i: (cmd : { index: number }) => {
+  record_i: (cmd: { index: number }) => {
     const tuple = S.pop()
 
     if (tuple.type !== 'tuple') {
-      throw Error("# can only be used on tuples")
+      throw Error('# can only be used on tuples')
     }
 
     if (cmd.index < 0 || cmd.index >= tuple.value.length) {
-      throw Error("index out of bounds")
+      throw Error('index out of bounds')
     }
 
     S.push(rttc.getTypedTupleElem(tuple, cmd.index))
@@ -602,77 +624,77 @@ const microcode : { [tag: string]: Function } = {
     for (let i = 0; i < cmd.arity; i++) {
       args.push(S.pop())
     }
-    const func = S.pop() 
+    const func = S.pop()
 
-    // TODO: Implement tail call 
-    A.push({ tag: 'env_i', env: E }) 
+    // TODO: Implement tail call
+    A.push({ tag: 'env_i', env: E })
 
     A.push(func.body)
-    // set E to the function env, extended with params and args 
-    const newFrame = {} 
+    // set E to the function env, extended with params and args
+    const newFrame = {}
     for (let j = 0; j < cmd.arity; j++) {
       newFrame[func.params[j]] = args[j]
     }
     E = {
-      head: newFrame, 
-      tail: func.env, 
-      id: E.id,  
+      head: newFrame,
+      tail: func.env,
+      id: E.id,
       name: 'program'
     }
   },
-  branch_i: (cmd: { cons: any, alt: any, node: es.ConditionalExpression, isCheck: boolean }) => {
+  branch_i: (cmd: { cons: any; alt: any; node: es.ConditionalExpression; isCheck: boolean }) => {
     if (cmd.isCheck) {
-      const checkCons = {...cmd.cons, isCheck: cmd.isCheck}
-      const checkAlt = {...cmd.alt, isCheck: cmd.isCheck}
+      const checkCons = { ...cmd.cons, isCheck: cmd.isCheck }
+      const checkAlt = { ...cmd.alt, isCheck: cmd.isCheck }
       A.push(checkCons)
-      A.push(checkAlt) 
+      A.push(checkAlt)
       return
     }
 
-    const pred = S.pop() 
+    const pred = S.pop()
     const error = rttc.checkIfStatement(cmd.node, pred)
     if (error) {
       throw error
     }
-    
-    A.push(pred.value ? cmd.cons : cmd.alt) 
+
+    A.push(pred.value ? cmd.cons : cmd.alt)
   },
-  closure_i: (cmd: { params: any[], body: any, env: Environment }) => {
-    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env})
+  closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
+    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
   }
 }
 // tslint:enable:object-literal-shorthand
 
-export function* evaluate(node: es.Node, context: Context) : any{
+export function* evaluate(node: es.Node, context: Context): any {
   A = new Stack<any>()
   S = new Stack<Value>()
-  E = createGlobalEnvironment() 
-  console.log("=====START EVALUATION=====")
+  E = createGlobalEnvironment()
+  console.log('=====START EVALUATION=====')
   A.push(yield* evaluators[node.type](node, context))
-  let i = 0; 
+  let i = 0
   while (i < step_limit) {
-    if (A.size() === 0) break 
+    if (A.size() === 0) break
     const cmd = A.pop()
-    console.log("\n=====instruction====")
+    console.log('\n=====instruction====')
     console.log(cmd)
     // console.log("\n=====agenda====")
-    // A.print() 
+    // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
-      console.log("before stash:")
+      console.log('before stash:')
       S.print() // print stash
       microcode[cmd.tag](cmd)
-      console.log("after stash:")
+      console.log('after stash:')
       S.print() // print stash
     } else {
-      console.log("error")
+      console.log('error')
     }
-    i++; 
+    i++
   }
 
   // const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
-  console.log("\n=====EXIT EVALUATION=====\n")
-  const r = S.pop(); 
+  console.log('\n=====EXIT EVALUATION=====\n')
+  const r = S.pop()
   console.log(r)
   return r.value
 }

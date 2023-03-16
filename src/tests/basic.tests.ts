@@ -344,14 +344,14 @@ describe('list creation with []', () => {
   test('free list fails with int list elem of lesser nesting', () => {
     const code: string = '[[[]], [1]];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected \'a list list or its subset, got int list.')
+      expect(error.explain()).toMatch("Expected 'a list list or its subset, got int list.")
     })
   })
 
   test('non-free list fails with free list elem of larger nesting', () => {
     const code: string = '[[], [1], [[]]];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int list or its subset, got \'a list list.')
+      expect(error.explain()).toMatch("Expected int list or its subset, got 'a list list.")
     })
   })
 })

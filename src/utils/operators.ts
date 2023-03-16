@@ -1,11 +1,7 @@
-import { BinaryOperator, SourceLocation,UnaryOperator } from 'estree'
+import { BinaryOperator, SourceLocation, UnaryOperator } from 'estree'
 
 import { LazyBuiltIn } from '../createContext'
-import {
-  CallingNonFunctionValue,
-  ExceptionError,
-  InvalidNumberOfArguments
-} from '../errors/errors'
+import { CallingNonFunctionValue, ExceptionError, InvalidNumberOfArguments } from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Thunk, TypedValue } from '../types'
 import * as create from './astCreator'
@@ -125,7 +121,7 @@ export function boolOrErr(candidate: any, line: number, column: number) {
 
 export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocation) {
   argument = forceIt(argument)
-  const line = loc.start.line;
+  const line = loc.start.line
   const column = loc.start.column
   const error = rttc.checkUnaryExpression(
     create.locationDummyNode(line, column),
@@ -207,7 +203,7 @@ export function evaluateBinaryExpression(operator: BinaryOperator | string, left
     case '::':
       return executeAppend(l, r)
     default:
-      return Error("Invalid binary operator " + operator)
+      return Error('Invalid binary operator ' + operator)
   }
 }
 
