@@ -4,12 +4,10 @@ import { LazyBuiltIn } from '../createContext'
 import {
   CallingNonFunctionValue,
   ExceptionError,
-  GetInheritedPropertyError,
   InvalidNumberOfArguments
 } from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Thunk, TypedValue } from '../types'
-import { locationDummyNode } from './astCreator'
 import * as create from './astCreator'
 import { makeWrapper } from './makeWrapper'
 import * as rttc from './rttc'
@@ -152,7 +150,7 @@ export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
 }
 
 export function binaryOp(
-  operator: string,
+  operator: BinaryOperator | string,
   left: TypedValue,
   right: TypedValue,
   loc: SourceLocation
@@ -179,7 +177,7 @@ const executeAppend = (left: any, right: any) => {
   return [left].concat(right) // Append is right associative
 }
 
-export function evaluateBinaryExpression(operator: any, left: any, right: any) {
+export function evaluateBinaryExpression(operator: BinaryOperator | string, left: any, right: any) {
   const l = left.value
   const r = right.value
   switch (operator) {

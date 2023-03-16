@@ -309,7 +309,7 @@ describe('list creation with []', () => {
   test('literals of different types', () => {
     const code: string = '[1, true, 3];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected int as list element, got boolean")
+      expect(error.explain()).toMatch('Expected int or its subset, got boolean.')
     })
   })
 
@@ -323,14 +323,35 @@ describe('list creation with []', () => {
   test('nested lists of different type', () => {
     const code: string = '[[1], ["hello"], [3]];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected int list as list element, got string list")
+      expect(error.explain()).toMatch('Expected int list or its subset, got string list.')
     })
   })
 
-  test('free list of different levels of nesting', () => {
+  test('free lists of different levels of nesting', () => {
     const code: string = '[[[[]]], [], [[]]];'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual([[[[]]], [], [[]]])
+    })
+  })
+
+  test('non-free list with free list elems of different levels of nesting', () => {
+    const code: string = '[[], [[]], [[1]], [], [[]]];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[], [[]], [[1]], [], [[]]])
+    })
+  })
+
+  test('free list fails with int list elem of lesser nesting', () => {
+    const code: string = '[[[]], [1]];'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected \'a list list or its subset, got int list.')
+    })
+  })
+
+  test('non-free list fails with free list elem of larger nesting', () => {
+    const code: string = '[[], [1], [[]]];'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected int list or its subset, got \'a list list.')
     })
   })
 })
@@ -342,40 +363,43 @@ describe('list creation with ::', () => {
   test('simple list with only literals, ends with nil', () => {
     const code: string = '1::2::3::4::5::nil;'
     return runInContext(code, context, options).then(data => {
-      expect((data as Finished).value).toStrictEqual([1,2,3,4,5])
+      expect((data as Finished).value).toStrictEqual([1, 2, 3, 4, 5])
     })
   })
 
   test('simple list with only literals, ends with list', () => {
     const code: string = '1::2::3::[4,5];'
     return runInContext(code, context, options).then(data => {
-      expect((data as Finished).value).toStrictEqual([1,2,3,4,5])
+      expect((data as Finished).value).toStrictEqual([1, 2, 3, 4, 5])
     })
   })
 
   test('RHS is not nil or list', () => {
     const code: string = '4::5;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected list on right hand side of operation, got int.")
+      expect(error.explain()).toMatch('Expected list on right hand side of operation, got int.')
     })
   })
 
   test('list of different types', () => {
     const code: string = '1::true::5::nil;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected int on left hand side of operation, got boolean.")
+      expect(error.explain()).toMatch('Expected int on left hand side of operation, got boolean.')
     })
   })
 
   test('nested list creation with ::', () => {
     const code: string = '(1::3::nil)::[5::[7]];'
     return runInContext(code, context, options).then(data => {
-      expect((data as Finished).value).toStrictEqual([[1,3],[5,7]])
+      expect((data as Finished).value).toStrictEqual([
+        [1, 3],
+        [5, 7]
+      ])
     })
   })
 
   test('operator precedence maintains', () => {
-    const code: string = '(true::1+2=2::nil)::[2 + 3 > 6]::[[true]];'
+    const code: string = '(true::(1+2=2)::nil)::[2 + 3 > 6]::[[true]];'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual([[true, false], [false], [true]])
     })
@@ -402,7 +426,6 @@ describe('list creation with ::', () => {
     })
   })
 })
-
 
 /**
  * FUNCTION DECLARATIONS
@@ -432,14 +455,14 @@ describe('fun declaration', () => {
   test('unbound variable in fun declaration', () => {
     const code: string = 'fun test x = x + y;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Unbound variable y")
+      expect(error.message).toMatch('Unbound variable y')
     })
   })
 
   test('unbound variable in nested fun declaration', () => {
     const code: string = 'fun test x = let fun test2 y = y + x + z; in test2(2); end; test(1);'
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Unbound variable z")
+      expect(error.message).toMatch('Unbound variable z')
     })
   })
 
@@ -486,14 +509,14 @@ describe('lambdas', () => {
   test('unbound variable in lambda', () => {
     const code: string = 'fn x => x + y;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Unbound variable y")
+      expect(error.message).toMatch('Unbound variable y')
     })
   })
 
   test('unbound variable in nested lambda', () => {
     const code: string = '(fn x => (fn y => y + x + z)(2)) (1);'
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Unbound variable z")
+      expect(error.message).toMatch('Unbound variable z')
     })
   })
 
@@ -511,7 +534,7 @@ describe('lambdas', () => {
                               else 10; 
                           test(3);`
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Unbound variable test")
+      expect(error.message).toMatch('Unbound variable test')
     })
   })
 })
@@ -527,7 +550,7 @@ describe('val rec', () => {
                               else 200; 
                           test(3);`
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Unbound variable test")
+      expect(error.message).toMatch('Unbound variable test')
     })
   })
 
@@ -542,8 +565,8 @@ describe('val rec', () => {
     })
   })
 
-  test("within local declaration", () => {
-    const code : string = `
+  test('within local declaration', () => {
+    const code: string = `
                           let 
                             val rec test = fn x => 
                             if (x > 0) 
@@ -557,8 +580,8 @@ describe('val rec', () => {
     })
   })
 
-  test("within fun declaration", () => {
-    const code : string = `
+  test('within fun declaration', () => {
+    const code: string = `
                           fun hello y = 
                             let 
                               val rec test = fn x => 
@@ -574,8 +597,8 @@ describe('val rec', () => {
     })
   })
 
-  test("within rec lambda", () => {
-    const code : string = `
+  test('within rec lambda', () => {
+    const code: string = `
                           val rec hello = fn y => 
                             let 
                               val rec test = fn x => 
@@ -590,15 +613,14 @@ describe('val rec', () => {
       expect((data as Finished).value).toBe(199)
     })
   })
-
 })
 
 /**
  * LOCAL
  */
 describe('local', () => {
-  test("local with var dec", () => {
-    const code : string = `
+  test('local with var dec', () => {
+    const code: string = `
       local 
         val x = 1; 
       in 
@@ -611,8 +633,8 @@ describe('local', () => {
     })
   })
 
-  test("local with fun", () => {
-    const code : string = `
+  test('local with fun', () => {
+    const code: string = `
       local 
         val x = 1;
         fun z n = n + 3; 
@@ -626,8 +648,8 @@ describe('local', () => {
     })
   })
 
-  test("local with var lambda", () => {
-    const code : string = `
+  test('local with var lambda', () => {
+    const code: string = `
       local 
         val x = 1;
         val z = fn n => n + 3; 
@@ -641,8 +663,8 @@ describe('local', () => {
     })
   })
 
-  test("local with recursive", () => {
-    const code : string = `
+  test('local with recursive', () => {
+    const code: string = `
       local 
         val rec test = fn x => 
         if (x > 0) 
@@ -658,8 +680,8 @@ describe('local', () => {
     })
   })
 
-  test("local with multiple dec", () => {
-    const code : string = `
+  test('local with multiple dec', () => {
+    const code: string = `
       local 
         val x = 1;
         val y = 2; 
@@ -676,8 +698,8 @@ describe('local', () => {
     })
   })
 
-  test("local decs can access vars outside block", () => {
-    const code : string = `
+  test('local decs can access vars outside block', () => {
+    const code: string = `
       val x = 1; 
       val y = 2; 
       local 
@@ -694,8 +716,8 @@ describe('local', () => {
     })
   })
 
-  test("local decs should override vars outside block", () => {
-    const code : string = `
+  test('local decs should override vars outside block', () => {
+    const code: string = `
       val x = 1; 
       val y = 2; 
       local 
@@ -711,8 +733,8 @@ describe('local', () => {
     })
   })
 
-  test("local decs are inaccessible outside of the block", () => {
-    const code : string = `
+  test('local decs are inaccessible outside of the block', () => {
+    const code: string = `
       local 
         val x = 1; 
       in 
@@ -721,12 +743,12 @@ describe('local', () => {
       x; 
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Unbound variable x")
+      expect(error.message).toMatch('Unbound variable x')
     })
   })
 
-  test("nested local declarations", () => {
-    const code : string = `
+  test('nested local declarations', () => {
+    const code: string = `
       local 
         local
           val x = 1;  

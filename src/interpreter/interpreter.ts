@@ -510,13 +510,11 @@ const microcode : { [tag: string]: Function } = {
     const left = S.pop()
     const result = binaryOp(cmd.sym, left, right, cmd.loc)
     S.push(rttc.getTypedLiteral(result))
-    // S.push(evaluateBinaryExpression(cmd.sym, left, right))
   },
   unop_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
     const arg = S.pop()
     const result = unaryOp(cmd.sym, arg, cmd.loc)
     S.push(rttc.getTypedLiteral(result))
-    // S.push(evaluateUnaryExpression(cmd.sym, arg))
   },
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env 
@@ -529,25 +527,23 @@ const microcode : { [tag: string]: Function } = {
   },
   list_lit_i: (cmd: { len: number, node: es.ArrayExpression }) => {
     const list = []
-    let first = undefined
+    let type = undefined
     for (let i = 0; i < cmd.len; i++) {
       const elem : TypedValue = S.pop()
 
       // TODO: account for free lists
-      if (first == undefined) {
-        first = elem
+      if (type == undefined) {
+        type = elem
       }
 
-      if (!rttc.isTypeEqual(first, elem)) {
-        throw new rttc.TypeError(cmd.node, ' as list element', first, elem)
-      }
+      type = rttc.updateListType(type, elem, cmd.node)
 
       list.push(elem.value)
     }
 
-    S.push(rttc.getDeclaredTypedList(first, list))
+    S.push(rttc.getDeclaredTypedList(type, list))
   },
-  list_merge_i: (cmd: { len: number, node: es.ArrayExpression }) => {
+  list_merge_i: (cmd: { node: es.ArrayExpression, loc: es.SourceLocation }) => {
     // const list = []
 
     // let first = undefined
