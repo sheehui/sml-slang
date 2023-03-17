@@ -38,8 +38,6 @@ const isNumber = (v: Value) => typeOf(v) === 'number'
 const isArrayIndex = (v: Value) => isNumber(v) && v >>> 0 === v && v < 2 ** 32 - 1
 const isString = (v: Value) => typeOf(v) === 'string'
 const isBool = (v: Value) => typeOf(v) === 'boolean'
-const isObject = (v: Value) => typeOf(v) === 'object'
-const isList = (v: Value) => typeOf(v) === 'array'
 const isNil = (v: Value) => typeOf(v) === 'null'
 
 const isTypedNumber = (v: TypedValue) => v.type === 'int'
