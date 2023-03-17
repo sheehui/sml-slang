@@ -472,20 +472,25 @@ const microcode: { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  list_merge: (cmd: { elems: any[]; isCheck: boolean; node: es.ArrayExpression }) => {
-    !cmd.isCheck && A.push({ tag: 'list_merge_i', len: cmd.elems.length })
-    cmd.elems.forEach(x => {
-      x['isCheck'] = cmd.isCheck
-      A.push(x)
-    })
-  },
   list_append: (cmd: {
     elems: any[]
     isCheck: boolean
     node: es.ArrayExpression
     loc: es.SourceLocation
   }) => {
-    !cmd.isCheck && A.push({ tag: 'list_append_i', loc: cmd.loc })
+    !cmd.isCheck && A.push({ tag: 'list_append_i', len: cmd.elems.length, loc: cmd.loc })
+    cmd.elems.forEach(x => {
+      x['isCheck'] = cmd.isCheck
+      A.push(x)
+    })
+  },
+  list_construct: (cmd: {
+    elems: any[]
+    isCheck: boolean
+    node: es.ArrayExpression
+    loc: es.SourceLocation
+  }) => {
+    !cmd.isCheck && A.push({ tag: 'list_construct_i', loc: cmd.loc })
     cmd.elems.forEach(x => {
       x['isCheck'] = cmd.isCheck
       A.push(x)
@@ -556,7 +561,7 @@ const microcode: { [tag: string]: Function } = {
   list_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const list = []
     let type = undefined
-    
+
     for (let i = 0; i < cmd.len; i++) {
       const elem: TypedValue = S.pop()
 
@@ -571,7 +576,7 @@ const microcode: { [tag: string]: Function } = {
 
     S.push(rttc.getDeclaredTypedList(type, list))
   },
-  list_merge_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+  list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     // const list = []
     // let first = undefined
     // //TODO: check both is list + same type
@@ -584,17 +589,17 @@ const microcode: { [tag: string]: Function } = {
     //     first = elem.value[0]
     //   }
     //   if (!rttc.isTypeEqual(first, elem)) {
-    //     throw new rttc.TypeError(cmd.node, ' as list element to merge @', first, elem)
+    //     throw new rttc.TypeError(cmd.node, ' as list element to append @', first, elem)
     //   }
     //   list.push(...elem.value)
     // }
     // S.push(rttc.getTypedList(first, list))
   },
-  list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+  list_construct_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     const left = S.pop()
     const right = S.pop()
     const result = binaryOp('::', left, right, cmd.loc)
-    S.push(rttc.getAppendedTypedList(left, right, result))
+    S.push(rttc.getConstructedTypedList(left, right, result))
   },
   tuple_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const tuple = []

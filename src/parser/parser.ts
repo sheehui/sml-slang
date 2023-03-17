@@ -12,6 +12,7 @@ import {
   AppendContext,
   BooleanContext,
   ConditionalContext,
+  ConstructContext,
   DeclarationContext,
   DivisionContext,
   EqualContext,
@@ -27,7 +28,6 @@ import {
   ListContext,
   LocalDecContext,
   LocalDecsContext,
-  MergeContext,
   ModuloContext,
   MultiplicationContext,
   NegationContext,
@@ -156,12 +156,12 @@ function contextToLocation(ctx: ExpressionContext): es.SourceLocation {
   }
 }
 
-function help(expressions: es.Expression[], str: string) : es.Expression[] {
-  const arr : es.Expression[] = [] 
+function help(expressions: es.Expression[], str: string): es.Expression[] {
+  const arr: es.Expression[] = []
   for (let i = 0; i < expressions.length; i++) {
-    const curr : es.Expression = expressions[i] 
+    const curr: es.Expression = expressions[i]
     if (curr.leadingComments && curr.leadingComments![0].value === str) {
-      arr.push(...(curr as any).elements) 
+      arr.push(...(curr as any).elements)
     } else {
       arr.push(curr)
     }
@@ -287,22 +287,25 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     }
   }
 
-  visitAppend(ctx: AppendContext): es.Expression {
+  visitConstruct(ctx: ConstructContext): es.Expression {
     const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{type: "Line", value: 'list_append'}],
+      leadingComments: [{ type: 'Line', value: 'list_construct' }],
       loc: contextToLocation(ctx)
     }
   }
 
-  visitMerge(ctx: MergeContext): es.Expression {
+  visitAppend(ctx: AppendContext): es.Expression {
     // const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
     return {
       type: 'ArrayExpression',
-      elements: help(ctx.expression().map(exp => exp.accept(this)), 'list_merge'),
-      leadingComments: [{type: "Line", value: 'list_merge'}],
+      elements: help(
+        ctx.expression().map(exp => exp.accept(this)),
+        'list_append'
+      ),
+      leadingComments: [{ type: 'Line', value: 'list_append' }],
       loc: contextToLocation(ctx)
     }
   }
@@ -423,25 +426,26 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return expressions
   }
 
-  visitFuncApp(ctx: FuncAppContext) : es.Expression {
-    const callee : es.Expression = this.visit(ctx._callee); 
+  visitFuncApp(ctx: FuncAppContext): es.Expression {
+    const callee: es.Expression = this.visit(ctx._callee)
     if (!['Identifier', 'FunctionExpression'].includes(callee.type)) {
       throw Error(`Cannot apply to a ${callee.type}`)
     }
-    const exprs = ctx.expression() 
+    const exprs = ctx.expression()
     const args = []
-    for (let i = 1; i < exprs.length; i++) { // skip the first expr as its the callee 
+    for (let i = 1; i < exprs.length; i++) {
+      // skip the first expr as its the callee
       args.push(exprs[i].accept(this))
     }
     return {
-      type: 'CallExpression', 
+      type: 'CallExpression',
       callee,
       arguments: args,
-      optional: false // not sure what this does yet 
+      optional: false // not sure what this does yet
     }
   }
 
-  visitFuncExpr(ctx: FuncExprContext) : es.Expression {
+  visitFuncExpr(ctx: FuncExprContext): es.Expression {
     return {
       type: 'FunctionExpression',
       id: null,
@@ -506,15 +510,16 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
 class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
     const init = new ExpressionGenerator().visit(ctx._value) // variable value
-    const id : es.Identifier = {
+    const id: es.Identifier = {
       type: 'Identifier',
       name: ctx._identifier.text! // '!' is a non-null assertion operator
     }
 
-    if (ctx.REC() && init.type === 'FunctionExpression') { // 'rec' can only be specified for lambdas 
+    if (ctx.REC() && init.type === 'FunctionExpression') {
+      // 'rec' can only be specified for lambdas
       // set id on lambda so that var name can be bound within the func block
-      // var dec will basically behave like a 'fun' dec 
-      init.id = id 
+      // var dec will basically behave like a 'fun' dec
+      init.id = id
     }
     return [
       {
@@ -551,23 +556,25 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
       }
     ]
   }
-  visitLocalDecs(ctx: LocalDecsContext) : es.VariableDeclarator[] {
-    const localDecs : es.VariableDeclarator[] = this.visitSeqDec(ctx._localDecs)
-    const decs : es.VariableDeclarator[] = this.visitSeqDec(ctx._decs)
+  visitLocalDecs(ctx: LocalDecsContext): es.VariableDeclarator[] {
+    const localDecs: es.VariableDeclarator[] = this.visitSeqDec(ctx._localDecs)
+    const decs: es.VariableDeclarator[] = this.visitSeqDec(ctx._decs)
     if (decs.length > 0) {
       // to handle nested local (i.e. if decs has its own 'locals' field)
-      const prevDecs : es.VariableDeclarator[] = decs[0]['locals'] ? decs[0]['locals'].decs.declarations : []
-      
+      const prevDecs: es.VariableDeclarator[] = decs[0]['locals']
+        ? decs[0]['locals'].decs.declarations
+        : []
+
       decs[0]['locals'] = {
         decs: {
           type: 'VariableDeclaration',
           declarations: localDecs.concat(prevDecs),
           kind: 'const'
         },
-        arity: decs.length 
+        arity: decs.length
       }
     }
-    return decs 
+    return decs
   }
   visitSeqDec(ctx: SeqDeclContext): es.VariableDeclarator[] {
     const ctxs = ctx.declaration()
@@ -665,37 +672,45 @@ class StmtGenerator implements SmlSlangVisitor<es.Statement> {
 
 class PatternGenerator implements SmlSlangVisitor<es.Pattern[]> {
   visitPattId(ctx: PattIdContext): es.Pattern[] {
-    return [{
-      type: 'Identifier',
-      name: ctx.ID()?.text!
-    }]
+    return [
+      {
+        type: 'Identifier',
+        name: ctx.ID()?.text!
+      }
+    ]
   }
 
   visitPattWildc(ctx: PattWildcContext): es.Pattern[] {
-    return [{
-      type: 'Identifier',
-      name: '_'
-    }]
+    return [
+      {
+        type: 'Identifier',
+        name: '_'
+      }
+    ]
   }
 
-  visitPattTuple(ctx: PattTupleContext) : es.Pattern[] {
-    const patterns = ctx.pattern() 
+  visitPattTuple(ctx: PattTupleContext): es.Pattern[] {
+    const patterns = ctx.pattern()
     const elements = patterns.reduce((x, y) => x.concat(y.accept(this)), [] as es.Pattern[])
     return elements
   }
 
-  visitPattNum(ctx: PattNumContext) : es.Pattern[] {
-    return [{
-      type: 'Identifier',
-      name: '_'
-    }]
+  visitPattNum(ctx: PattNumContext): es.Pattern[] {
+    return [
+      {
+        type: 'Identifier',
+        name: '_'
+      }
+    ]
   }
 
-  visitPattBool(ctx: PattBoolContext) : es.Pattern[] {
-    return [{
-      type: 'Identifier',
-      name: '_'
-    }]
+  visitPattBool(ctx: PattBoolContext): es.Pattern[] {
+    return [
+      {
+        type: 'Identifier',
+        name: '_'
+      }
+    ]
   }
 
   visit(tree: ParseTree): es.Pattern[] {

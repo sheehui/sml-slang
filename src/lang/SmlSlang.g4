@@ -6,8 +6,8 @@ grammar SmlSlang;
 POW: '^';
 MUL: '*';
 HASH: '#';
-APPEND: '::';
-MERGE: '@';
+DCOLON: '::';
+AMPERSAND: '@';
 DIV: 'div';
 ADD: '+';
 SUB: '-';
@@ -67,14 +67,15 @@ expression
    | NIL                                                          # Nil
 
    | FN params=pattern LAMARR (expression)                          # FuncExpr
-   | callee=expression '(' ( expression ( ',' expression )* )? ')'        # FuncApp
+   | callee=expression '(' ( expression ( ',' expression )* )? ')'  # FuncApp
+
    | '(' inner=expression ')'                                     # Parentheses
    | '(' ( expression ( ',' expression )* )? ')'                  # Tuple
    | record=TUPLE_ACCESS expr=expression                          # TupleAccess
 
    | '[' ( expression ( ',' expression )* )? ']'                  # List
-   | expression (APPEND expression)+                              # Append
-   | expression (MERGE expression)+                               # Merge
+   | expression (DCOLON expression)+                              # Construct
+   | expression (AMPERSAND expression)+                           # Append
 
    | operator=NEG right=expression                                # Negation
    | operator=NOT right=expression                                # Not

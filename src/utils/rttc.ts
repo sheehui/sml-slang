@@ -64,7 +64,7 @@ const getListDepth = (v: TypedValue) => {
     }
     return depth
   }
-  throw Error("cannot get list depth of non-list type")
+  throw Error('cannot get list depth of non-list type')
 }
 
 // We need to define our own typeof in order for null/array to display properly in error messages
@@ -93,8 +93,8 @@ const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
         ? true
         : getListDepth(superset) <= getListDepth(subset)
       : isFreeList(subset)
-        ? getListDepth(superset) >= getListDepth(subset)
-        : isTypeEqual(superset, subset)
+      ? getListDepth(superset) >= getListDepth(subset)
+      : isTypeEqual(superset, subset)
   }
 
   if (isTypedTuple(superset) && isTypedTuple(subset)) {
@@ -185,7 +185,7 @@ export const getDeclaredTypedList = (first: TypedValue | undefined, val: any): T
   }
 }
 
-export const getAppendedTypedList = (left: TypedValue, right: TypedValue, val: any): TypedValue => {
+export const getConstructedTypedList = (left: TypedValue, right: TypedValue, val: any): TypedValue => {
   let typeArr = right.typeArr!
 
   if (isFreeList(right)) {
@@ -276,7 +276,7 @@ const isTypeArrEqual = (expected: Array<SmlType>, got: Array<SmlType>) => {
   return expected.toString() === got.toString()
 }
 
-const checkAppendExpression = (node: es.Node, left: TypedValue, right: TypedValue) => {
+const checkConstructExpression = (node: es.Node, left: TypedValue, right: TypedValue) => {
   if (!isTypedList(right)) {
     // right side needs to be some list
     return new TypeError(node, RHS, 'list', right)
@@ -341,7 +341,7 @@ export const checkBinaryExpression = (
     case '===':
       return
     case '::':
-      return checkAppendExpression(node, left, right)
+      return checkConstructExpression(node, left, right)
     default:
       return
   }
@@ -367,7 +367,4 @@ export const checkIfStatement = (node: es.Node, test: TypedValue) => {
 
 export const isIdentifier = (node: any): node is es.Identifier => {
   return (node as es.Identifier).name !== undefined
-}
-export function updateType(type: any, elem: TypedValue, node: es.ArrayExpression): any {
-  throw new Error('Function not implemented.')
 }

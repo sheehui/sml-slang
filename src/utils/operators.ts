@@ -168,11 +168,6 @@ export function binaryOp(
   }
 }
 
-const executeAppend = (left: any, right: any) => {
-  // RHS guaranteed to be a list
-  return [left].concat(right) // Append is right associative
-}
-
 export function evaluateBinaryExpression(operator: BinaryOperator | string, left: any, right: any) {
   const l = left.value
   const r = right.value
@@ -201,7 +196,7 @@ export function evaluateBinaryExpression(operator: BinaryOperator | string, left
     case '>=':
       return l >= r
     case '::':
-      return executeAppend(l, r)
+      return [l].concat(r)
     default:
       return Error('Invalid binary operator ' + operator)
   }
