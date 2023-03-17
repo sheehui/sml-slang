@@ -146,7 +146,7 @@ export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
 }
 
 export function binaryOp(
-  operator: BinaryOperator | string,
+  operator: BinaryOperator | '::' | '@',
   left: TypedValue,
   right: TypedValue,
   loc: SourceLocation

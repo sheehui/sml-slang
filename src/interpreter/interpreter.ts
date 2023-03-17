@@ -577,6 +577,10 @@ const microcode: { [tag: string]: Function } = {
     S.push(rttc.getDeclaredTypedList(type, list))
   },
   list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+    const left = S.pop()
+    const right = S.pop()
+    const result = binaryOp('@', left, right, cmd.loc)
+    S.push(rttc.getConstructedTypedList(left, right, result))
     // const list = []
     // let first = undefined
     // //TODO: check both is list + same type

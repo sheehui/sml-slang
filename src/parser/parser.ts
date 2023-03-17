@@ -37,7 +37,6 @@ import {
   NumberContext,
   ParenthesesContext,
   PattBoolContext,
-  PatternContext,
   PattIdContext,
   PattNumContext,
   PattTupleContext,
@@ -298,13 +297,10 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   }
 
   visitAppend(ctx: AppendContext): es.Expression {
-    // const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
+    const expressions: es.Expression[] = [this.visit(ctx._left), this.visit(ctx._right)]
     return {
       type: 'ArrayExpression',
-      elements: help(
-        ctx.expression().map(exp => exp.accept(this)),
-        'list_append'
-      ),
+      elements: expressions,
       leadingComments: [{ type: 'Line', value: 'list_append' }],
       loc: contextToLocation(ctx)
     }

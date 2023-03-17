@@ -75,7 +75,7 @@ expression
 
    | '[' ( expression ( ',' expression )* )? ']'                  # List
    | expression (DCOLON expression)+                              # Construct
-   | expression (AMPERSAND expression)+                           # Append
+   | left=expression AMPERSAND right=expression                   # Append
 
    | operator=NEG right=expression                                # Negation
    | operator=NOT right=expression                                # Not
@@ -107,7 +107,7 @@ seqDecl
    ;
 
 declaration
-   : VAL REC?  identifier=ID EQUAL value=expression                     # VarDec
+   : VAL REC?  identifier=ID EQUAL value=expression               # VarDec
    | FUN identifier=ID params=pattern EQUAL value=expression      # FunDec
    | LOCAL localDecs=seqDecl IN decs=seqDecl END                  # LocalDecs
    ;

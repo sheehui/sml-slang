@@ -299,9 +299,25 @@ const checkConstructExpression = (node: es.Node, left: TypedValue, right: TypedV
   return
 }
 
+const checkAppendExpression = (node: es.Node, left: TypedValue, right: TypedValue) => {
+  if (!isTypedList(right)) {
+    // right side needs to be some list
+    return new TypeError(node, RHS, 'list', right)
+  }
+
+  if (!isTypedList(left)) {
+    // left side needs to be some list
+    return new TypeError(node, LHS, 'list', left)
+  }
+
+  // if (!isTypeArrEqual(gotTypeArr, expectedTypeArr)) {
+  //   return new TypeError(node, RHS, typeArrToString(expectedTypeArr), typeArrToString(gotTypeArr))
+  // }
+}
+
 export const checkBinaryExpression = (
   node: es.Node,
-  operator: es.BinaryOperator | string,
+  operator: es.BinaryOperator | '@' | '::',
   left: TypedValue,
   right: TypedValue
 ) => {
@@ -342,6 +358,8 @@ export const checkBinaryExpression = (
       return
     case '::':
       return checkConstructExpression(node, left, right)
+    case '@':
+      return checkAppendExpression(node, left, right)
     default:
       return
   }
