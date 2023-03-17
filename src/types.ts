@@ -262,7 +262,7 @@ export type SmlValue = string | number | boolean
 
 export interface TypedValue {
   type: SmlType
-  typeArr?: Array<SmlType>
+  typeArr?: Array<SmlType> 
   value: SmlValue | Array<SmlValue>
 }
 

@@ -51,6 +51,22 @@ const isFreeList = (v: TypedValue) => isTypedList(v) && v.typeArr![0] === "'a"
 const isTypedTuple = (v: TypedValue) => v.type === 'tuple' && Array.isArray(v.value) && v.typeArr
 const isListOrTuple = (v: TypedValue) => isTypedList(v) || isTypedTuple(v)
 
+const getListDepth = (v: TypedValue) => {
+  if (isTypedList(v)) {
+    let depth = 0
+    const typeArr = v.typeArr!
+    for (let i = typeArr.length - 1; i >= 0; i--) {
+      if (typeArr[i] === 'list') {
+        depth++
+      } else {
+        break
+      }
+    }
+    return depth
+  }
+  throw Error("cannot get list depth of non-list type")
+}
+
 // We need to define our own typeof in order for null/array to display properly in error messages
 const typeOf = (v: Value) => {
   if (v === null) {
@@ -68,6 +84,28 @@ export const isTypeEqual = (left: TypedValue, right: TypedValue): boolean => {
   } else {
     return left.type === right.type
   }
+}
+
+const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
+  if (isTypedList(superset) && isTypedList(subset)) {
+    return isFreeList(superset)
+      ? isFreeList(subset)
+        ? true
+        : getListDepth(superset) <= getListDepth(subset)
+      : isFreeList(subset)
+        ? getListDepth(superset) >= getListDepth(subset)
+        : isTypeEqual(superset, subset)
+  }
+
+  if (isTypedTuple(superset) && isTypedTuple(subset)) {
+    // recursion
+  }
+
+  if (isFreeLiteral(superset) || isFreeLiteral(subset)) {
+    return true
+  }
+
+  return isTypeEqual(superset, subset)
 }
 
 const getTypeString = (val: TypedValue | string): string => {
@@ -110,28 +148,6 @@ const typeArrToString = (arr: SmlType[]) => {
   }
 }
 
-const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
-  if (isTypedList(superset) && isTypedList(subset)) {
-    return isFreeList(superset)
-      ? isFreeList(subset)
-        ? true
-        : superset.typeArr!.length <= subset.typeArr!.length // will fail for tuple
-      : isFreeList(subset)
-      ? superset.typeArr!.length >= subset.typeArr!.length // will fail for tuple
-      : isTypeArrEqual(superset.typeArr!, subset.typeArr!)
-  }
-
-  if (isTypedTuple(superset) && isTypedTuple(subset)) {
-    // recursion
-  }
-
-  if (isFreeLiteral(superset) || isFreeLiteral(subset)) {
-    return true
-  }
-
-  return superset.type === subset.type
-}
-
 export const updateListType = (
   currType: TypedValue,
   newType: TypedValue,
@@ -140,7 +156,7 @@ export const updateListType = (
   if (isTypeSubset(currType, newType)) {
     return isFreeList(currType)
       ? isFreeList(newType)
-        ? currType.typeArr!.length >= newType.typeArr!.length
+        ? getListDepth(currType) >= getListDepth(newType)
           ? currType
           : newType
         : newType
@@ -170,18 +186,18 @@ export const getDeclaredTypedList = (first: TypedValue | undefined, val: any): T
 }
 
 export const getAppendedTypedList = (left: TypedValue, right: TypedValue, val: any): TypedValue => {
-  const typeArr = right.typeArr!
+  let typeArr = right.typeArr!
 
   if (isFreeList(right)) {
-    typeArr.push('list') // free list
-
     if (!isFreeList(left)) {
       // assign a fixed type
       typeArr[0] = isTypedList(left) ? left.typeArr![0] : left.type
-    }
-
-    if (!isTypedList(left)) {
-      typeArr.pop()
+      if (isTypedList(left)) {
+        typeArr.push('list')
+      }
+    } else if (getListDepth(right) <= getListDepth(left)) {
+      typeArr = left.typeArr!
+      typeArr.push('list')
     }
   }
 

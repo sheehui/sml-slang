@@ -556,10 +556,10 @@ const microcode: { [tag: string]: Function } = {
   list_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const list = []
     let type = undefined
+    
     for (let i = 0; i < cmd.len; i++) {
       const elem: TypedValue = S.pop()
 
-      // TODO: account for free lists
       if (type == undefined) {
         type = elem
       }
