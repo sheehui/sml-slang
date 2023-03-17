@@ -197,6 +197,9 @@ export function evaluateBinaryExpression(operator: BinaryOperator | string, left
       return l >= r
     case '::':
       return [l].concat(r)
+    case '@':
+      l.push(...r)
+      return l
     default:
       return Error('Invalid binary operator ' + operator)
   }

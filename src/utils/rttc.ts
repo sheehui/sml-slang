@@ -185,7 +185,11 @@ export const getDeclaredTypedList = (first: TypedValue | undefined, val: any): T
   }
 }
 
-export const getConstructedTypedList = (left: TypedValue, right: TypedValue, val: any): TypedValue => {
+export const getConstructedTypedList = (
+  left: TypedValue,
+  right: TypedValue,
+  val: any
+): TypedValue => {
   let typeArr = right.typeArr!
 
   if (isFreeList(right)) {
@@ -199,6 +203,21 @@ export const getConstructedTypedList = (left: TypedValue, right: TypedValue, val
       typeArr = left.typeArr!
       typeArr.push('list')
     }
+  }
+
+  return {
+    type: 'list',
+    typeArr: typeArr,
+    value: val
+  }
+}
+
+export const getAppendedTypedList = (left: TypedValue, right: TypedValue, val: any): TypedValue => {
+  let typeArr = left.typeArr!
+
+  if (isFreeList(left)) {
+    typeArr =
+      isFreeList(right) && getListDepth(left) < getListDepth(right) ? right.typeArr! : left.typeArr!
   }
 
   return {
@@ -302,17 +321,37 @@ const checkConstructExpression = (node: es.Node, left: TypedValue, right: TypedV
 const checkAppendExpression = (node: es.Node, left: TypedValue, right: TypedValue) => {
   if (!isTypedList(right)) {
     // right side needs to be some list
-    return new TypeError(node, RHS, 'list', right)
+    return new TypeError(node, ' on right hand side of @', 'list', right)
   }
 
   if (!isTypedList(left)) {
     // left side needs to be some list
-    return new TypeError(node, LHS, 'list', left)
+    return new TypeError(node, ' on left hand side of @', 'list', left)
   }
 
-  // if (!isTypeArrEqual(gotTypeArr, expectedTypeArr)) {
-  //   return new TypeError(node, RHS, typeArrToString(expectedTypeArr), typeArrToString(gotTypeArr))
-  // }
+  if (isFreeList(left)) {
+    // right must be a superset OR any free list
+    if (isFreeList(right)) {
+      return
+    }
+
+    if (!isTypeSubset(right, left)) {
+      return new TypeError(node, ' or its superset on right hand side of @', left, right)
+    }
+  } else {
+    // right must be a free list of <= left depth OR same type
+    if (isFreeList(right)) {
+      return getListDepth(right) <= getListDepth(left)
+        ? undefined
+        : new TypeError(node, ' on right hand side of @', left, right)
+    }
+
+    if (!isTypeEqual(left, right)) {
+      return new TypeError(node, ' on right hand side of @', left, right)
+    }
+  }
+
+  return
 }
 
 export const checkBinaryExpression = (

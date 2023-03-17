@@ -580,7 +580,7 @@ const microcode: { [tag: string]: Function } = {
     const left = S.pop()
     const right = S.pop()
     const result = binaryOp('@', left, right, cmd.loc)
-    S.push(rttc.getConstructedTypedList(left, right, result))
+    S.push(rttc.getAppendedTypedList(left, right, result))
     // const list = []
     // let first = undefined
     // //TODO: check both is list + same type
