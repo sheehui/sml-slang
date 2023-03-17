@@ -74,7 +74,7 @@ expression
    | record=TUPLE_ACCESS expr=expression                          # TupleAccess
 
    | '[' ( expression ( ',' expression )* )? ']'                  # List
-   | expression (DCOLON expression)+                              # Construct
+   | expression (DCOLON expression)                               # Construct
    | left=expression AMPERSAND right=expression                   # Append
 
    | operator=NEG right=expression                                # Negation
