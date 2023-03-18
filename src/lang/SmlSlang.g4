@@ -3,7 +3,7 @@ grammar SmlSlang;
 /*
  * Tokens (terminal)
  */
-POW: '^';
+CONCAT: '^';
 MUL: '*';
 HASH: '#';
 DCOLON: '::';
@@ -78,19 +78,21 @@ expression
    | left=expression AMPERSAND right=expression                   # Append
 
    | operator=NEG right=expression                                # Negation
-   | operator=NOT right=expression                                # Not
 
-   | left=expression operator=POW right=expression                # Power
-   | left=expression operator=MUL right=expression                # Multiplication
-   | left=expression operator=DIV right=expression                # Division
+   | left=expression operator=(MUL | DIV | MOD) right=expression  # Factor
+
    | left=expression operator=ADD right=expression                # Addition
    | left=expression operator=SUB right=expression                # Subtraction
-   | left=expression operator=MOD right=expression                # Modulo
    
+   | left=expression operator=CONCAT right=expression             # Power
+
+   | operator=NOT right=expression                                # Not
+
    | left=expression operator=GT right=expression                 # GreaterThan
    | left=expression operator=GTE right=expression                # GreaterThanOrEqual
    | left=expression operator=LT right=expression                 # LessThan
-   | left=expression operator=LTE right=expression                # LessThanOrEqual 
+   | left=expression operator=LTE right=expression                # LessThanOrEqual
+
    | left=expression operator=EQUAL right=expression              # Equal
    | left=expression operator=NEQUAL right=expression             # Nequal
 

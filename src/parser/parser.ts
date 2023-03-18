@@ -1,5 +1,6 @@
 /* tslint:disable:max-classes-per-file */
 import { CharStreams, CommonTokenStream } from 'antlr4ts'
+import { Token } from 'antlr4ts/Token'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
 import { ParseTree } from 'antlr4ts/tree/ParseTree'
 import { RuleNode } from 'antlr4ts/tree/RuleNode'
@@ -14,9 +15,9 @@ import {
   ConditionalContext,
   ConstructContext,
   DeclarationContext,
-  DivisionContext,
   EqualContext,
   ExpressionContext,
+  FactorContext,
   FuncAppContext,
   FuncExprContext,
   FunDecContext,
@@ -28,8 +29,6 @@ import {
   ListContext,
   LocalDecContext,
   LocalDecsContext,
-  ModuloContext,
-  MultiplicationContext,
   NegationContext,
   NequalContext,
   NilContext,
@@ -155,17 +154,17 @@ function contextToLocation(ctx: ExpressionContext): es.SourceLocation {
   }
 }
 
-function help(expressions: es.Expression[], str: string): es.Expression[] {
-  const arr: es.Expression[] = []
-  for (let i = 0; i < expressions.length; i++) {
-    const curr: es.Expression = expressions[i]
-    if (curr.leadingComments && curr.leadingComments![0].value === str) {
-      arr.push(...(curr as any).elements)
-    } else {
-      arr.push(curr)
-    }
+function smlToJsBinop(token: Token): es.BinaryOperator {
+  switch (token.text) {
+    case '*':
+      return '*'
+    case 'div':
+      return '/'
+    case '%':
+      return '%'
+    default:
+      throw Error('undefined sml binop token ' + token.text)
   }
-  return arr
 }
 
 class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
@@ -238,24 +237,16 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     }
   }
 
-  visitMultiplication(ctx: MultiplicationContext): es.Expression {
+  visitFactor(ctx: FactorContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '*',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
     }
   }
-  visitDivision(ctx: DivisionContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '/',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
+
   visitAddition(ctx: AdditionContext): es.Expression {
     return {
       type: 'BinaryExpression',
@@ -270,16 +261,6 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return {
       type: 'BinaryExpression',
       operator: '-',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitModulo(ctx: ModuloContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '%',
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
