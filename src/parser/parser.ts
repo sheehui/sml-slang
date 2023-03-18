@@ -16,22 +16,18 @@ import {
   ConditionalContext,
   ConstructContext,
   DeclarationContext,
-  EqualContext,
+  EqualityContext,
   ExpressionContext,
   FactorContext,
   FuncAppContext,
   FuncExprContext,
   FunDecContext,
-  GreaterThanContext,
-  GreaterThanOrEqualContext,
   IdentifierContext,
-  LessThanContext,
-  LessThanOrEqualContext,
+  InequalityContext,
   ListContext,
   LocalDecContext,
   LocalDecsContext,
   NegationContext,
-  NequalContext,
   NilContext,
   NotContext,
   NumberContext,
@@ -167,6 +163,18 @@ function smlToJsBinop(token: Token): es.BinaryOperator {
       return '-'
     case '^':
       return '^'
+    case '=':
+      return '==='
+    case '<>':
+      return '!=='
+    case '>=':
+      return '>='
+    case '>':
+      return '>'
+    case '<=':
+      return '<='
+    case '<':
+      return '<'
     default:
       throw Error('undefined sml binop token ' + token.text)
   }
@@ -284,60 +292,20 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     }
   }
 
-  visitGreaterThan(ctx: GreaterThanContext): es.Expression {
+  visitEquality(ctx: EqualityContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '>',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
     }
   }
 
-  visitGreaterThanOrEqual(ctx: GreaterThanOrEqualContext): es.Expression {
+  visitInequality(ctx: InequalityContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '>=',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitLessThan(ctx: LessThanContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '<',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitLessThanOrEqual(ctx: LessThanOrEqualContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '<=',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitEqual(ctx: EqualContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '===',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitNequal(ctx: NequalContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '!==',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)

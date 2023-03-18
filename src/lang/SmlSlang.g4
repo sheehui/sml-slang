@@ -60,42 +60,35 @@ stmt
    ; 
 
 expression
-   : ID                                                           # Identifier
-   | STRING                                                       # String
-   | NUMBER                                                       # Number
-   | BOOLEAN                                                      # Boolean
-   | NIL                                                          # Nil
+   : ID                                                              # Identifier
+   | STRING                                                          # String
+   | NUMBER                                                          # Number
+   | BOOLEAN                                                         # Boolean
+   | NIL                                                             # Nil
 
-   | FN params=pattern LAMARR (expression)                          # FuncExpr
-   | callee=expression '(' ( expression ( ',' expression )* )? ')'  # FuncApp
+   | FN params=pattern LAMARR (expression)                           # FuncExpr
+   | callee=expression '(' ( expression ( ',' expression )* )? ')'   # FuncApp
 
-   | '(' inner=expression ')'                                     # Parentheses
-   | '(' ( expression ( ',' expression )* )? ')'                  # Tuple
-   | record=TUPLE_ACCESS expr=expression                          # TupleAccess
+   | '(' inner=expression ')'                                        # Parentheses
+   | '(' ( expression ( ',' expression )* )? ')'                     # Tuple
+   | record=TUPLE_ACCESS expr=expression                             # TupleAccess
 
-   | '[' ( expression ( ',' expression )* )? ']'                  # List
-   | expression (DCOLON expression)                               # Construct
-   | left=expression AMPERSAND right=expression                   # Append
+   | '[' ( expression ( ',' expression )* )? ']'                     # List
+   | <assoc=right> expression DCOLON expression                      # Construct
+   | left=expression AMPERSAND right=expression                      # Append
 
-   | operator=NEG right=expression                                # Negation
-
-   | left=expression operator=(MUL | DIV | MOD) right=expression  # Factor
-   | left=expression operator=(ADD | SUB) right=expression        # AddSub
+   | operator=NEG right=expression                                   # Negation
+   | left=expression operator=(MUL | DIV | MOD) right=expression     # Factor
+   | left=expression operator=(ADD | SUB) right=expression           # AddSub
    
-   | left=expression operator=CONCAT right=expression             # Concat
+   | left=expression operator=CONCAT right=expression                # Concat
 
-   | operator=NOT right=expression                                # Not
+   | operator=NOT right=expression                                   # Not
+   | left=expression operator=(GT | GTE | LT | LTE) right=expression # Inequality
+   | left=expression operator=(EQUAL | NEQUAL) right=expression      # Equality
 
-   | left=expression operator=GT right=expression                 # GreaterThan
-   | left=expression operator=GTE right=expression                # GreaterThanOrEqual
-   | left=expression operator=LT right=expression                 # LessThan
-   | left=expression operator=LTE right=expression                # LessThanOrEqual
-
-   | left=expression operator=EQUAL right=expression              # Equal
-   | left=expression operator=NEQUAL right=expression             # Nequal
-
-   | IF pred=expression THEN cons=expression ELSE alt=expression  # Conditional
-   | LET decl=seqDecl IN expr=seqExpr END                         # LocalDec
+   | IF pred=expression THEN cons=expression ELSE alt=expression     # Conditional
+   | LET decl=seqDecl IN expr=seqExpr END                            # LocalDec
    ;
 
 seqExpr
