@@ -183,28 +183,34 @@ describe('list append with @', () => {
   test('append list of different types', () => {
     const code: string = '[1]@[2]@[true];'
     return runInContext(code, context, options).catch(error => {
-        expect(error.explain()).toMatch('Expected int list on right hand side of @, got boolean list.')
+      expect(error.explain()).toMatch(
+        'Expected int list on right hand side of @, got boolean list.'
+      )
     })
   })
 
   test('append a free list that has a deeper nesting to another list ', () => {
     const code: string = '[1]@[[]];'
     return runInContext(code, context, options).catch(error => {
-        expect(error.explain()).toMatch('Expected int list on right hand side of @, got \'a list list.')
+      expect(error.explain()).toMatch(
+        "Expected int list on right hand side of @, got 'a list list."
+      )
     })
   })
 
   test('append a non-list element', () => {
     const code: string = '[1]@2;'
     return runInContext(code, context, options).catch(error => {
-        expect(error.explain()).toMatch('Expected list on right hand side of @, got int.')
+      expect(error.explain()).toMatch('Expected list on right hand side of @, got int.')
     })
   })
 
   test('append a non-free list of lesser level of nesting to a free list', () => {
     const code: string = '[[]]@[1];'
     return runInContext(code, context, options).catch(error => {
-        expect(error.explain()).toMatch('Expected \'a list list or its superset on right hand side of @, got int list.')
+      expect(error.explain()).toMatch(
+        "Expected 'a list list or its superset on right hand side of @, got int list."
+      )
     })
   })
 })
