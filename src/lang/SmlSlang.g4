@@ -80,11 +80,9 @@ expression
    | operator=NEG right=expression                                # Negation
 
    | left=expression operator=(MUL | DIV | MOD) right=expression  # Factor
-
-   | left=expression operator=ADD right=expression                # Addition
-   | left=expression operator=SUB right=expression                # Subtraction
+   | left=expression operator=(ADD | SUB) right=expression        # AddSub
    
-   | left=expression operator=CONCAT right=expression             # Power
+   | left=expression operator=CONCAT right=expression             # Concat
 
    | operator=NOT right=expression                                # Not
 

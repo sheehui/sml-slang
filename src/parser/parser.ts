@@ -9,9 +9,10 @@ import * as es from 'estree'
 
 import { SmlSlangLexer } from '../lang/SmlSlangLexer'
 import {
-  AdditionContext,
+  AddSubContext,
   AppendContext,
   BooleanContext,
+  ConcatContext,
   ConditionalContext,
   ConstructContext,
   DeclarationContext,
@@ -40,14 +41,12 @@ import {
   PattNumContext,
   PattTupleContext,
   PattWildcContext,
-  PowerContext,
   SeqDeclContext,
   SeqExprContext,
   SmlSlangParser,
   StartContext,
   StmtContext,
   StringContext,
-  SubtractionContext,
   TupleAccessContext,
   TupleContext,
   VarDecContext
@@ -160,8 +159,14 @@ function smlToJsBinop(token: Token): es.BinaryOperator {
       return '*'
     case 'div':
       return '/'
-    case '%':
+    case 'mod':
       return '%'
+    case '+':
+      return '+'
+    case '-':
+      return '-'
+    case '^':
+      return '^'
     default:
       throw Error('undefined sml binop token ' + token.text)
   }
@@ -224,10 +229,12 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
+
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expression())
   }
-  visitPower(ctx: PowerContext): es.Expression {
+
+  visitConcat(ctx: ConcatContext): es.Expression {
     return {
       type: 'BinaryExpression',
       operator: '^',
@@ -247,20 +254,10 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     }
   }
 
-  visitAddition(ctx: AdditionContext): es.Expression {
+  visitAddSub(ctx: AddSubContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '+',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitSubtraction(ctx: SubtractionContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '-',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
