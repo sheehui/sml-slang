@@ -35,6 +35,7 @@ END: 'end';
 FUN: 'fun';
 FN: 'fn'; 
 LAMARR: '=>'; 
+TYPARR: '->'; 
 WHILE: 'while';
 DO: 'do';
 SEMIC: ';'; 
@@ -100,15 +101,25 @@ seqDecl
    ;
 
 declaration
-   : VAL REC?  identifier=ID EQUAL value=expression               # VarDec
+   : VAL REC? identifier=pattern EQUAL value=expression           # VarDec
    | FUN identifier=ID params=pattern EQUAL value=expression      # FunDec
    | LOCAL localDecs=seqDecl IN decs=seqDecl END                  # LocalDecs
    ;
 
+type 
+   : 'int'                                                        # IntType
+   | 'bool'                                                       # BoolType
+   | 'string'                                                     # StrType 
+   | listType=type 'list'                                         # ListType 
+   | '(' inner=type ')'                                           # TypeParens
+   | left=type MUL right=type                                     # TupleType
+   | left=type TYPARR right=type                                  # FuncType
+   ;
+
 pattern
-   : WILDC                                                        # PattWildc
-   | ID                                                           # PattId
-   | NUMBER                                                       # PattNum
-   | BOOLEAN                                                      # PattBool
+   : WILDC (':' valType=type)?                                    # PattWildc
+   | ID (':' valType=type)?                                       # PattId
+   | NUMBER (':' valType=type)?                                   # PattNum
+   | BOOLEAN (':' valType=type)?                                  # PattBool
    | '(' ( pattern ( ',' pattern )* )? ')'                        # PattTuple
    ; 

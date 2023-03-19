@@ -3,7 +3,7 @@ import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { Context, Environment, TypedValue, Value } from '../types'
+import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
 import { binaryOp, unaryOp } from '../utils/operators'
 import * as rttc from '../utils/rttc'
@@ -143,7 +143,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   Identifier: function* (node: es.Identifier, context: Context) {
     return {
       tag: 'id', 
-      sym: node.name
+      sym: node.name,
+      type: (node as any).valType
     }
   },
 
@@ -222,7 +223,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     for (let i = 0; i < node.declarations.length; i++) {
       const decl = node.declarations[i]
-      ids.push(decl.id.type === "Identifier" ? decl.id.name : null) // assume that vars are declared with identifier only
+      ids.push(yield* evaluators[decl.id.type](decl.id, context))
 
       // deal with local declarations
       const locals = (decl as any).locals 
@@ -395,7 +396,7 @@ const microcode: { [tag: string]: Function } = {
     A.push(cmd.arg)
   },
   var: (cmd: {
-    ids: string[]
+    ids: any[]
     exprs: any[]
     localStartIdx: number
     localArity: number
@@ -412,7 +413,7 @@ const microcode: { [tag: string]: Function } = {
 
       A.push({
         tag: 'assmt',
-        sym: cmd.ids[i],
+        id: cmd.ids[i],
         expr: cmd.exprs[i],
         // frameOffset to skip the temp frame (if declaration is within 'local...in<HERE>end')
         frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0,
@@ -435,8 +436,8 @@ const microcode: { [tag: string]: Function } = {
       }
     }
   },
-  assmt: (cmd: { sym: string; expr: any; frameOffset: number; isCheck: boolean }) => {
-    A.push({ tag: 'assmt_i', sym: cmd.sym, frameOffset: cmd.frameOffset })
+  assmt: (cmd: { id: any; expr: any; frameOffset: number; isCheck: boolean }) => {
+    A.push({ tag: 'assmt_i', id: cmd.id, frameOffset: cmd.frameOffset })
     cmd.expr['isCheck'] = cmd.isCheck
     A.push(cmd.expr)
   },
@@ -552,11 +553,17 @@ const microcode: { [tag: string]: Function } = {
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env
   },
-  assmt_i: (cmd: { sym: string; frameOffset: number }) => {
+  assmt_i: (cmd: { id: any; frameOffset: number }) => {
+    const val = S.peek() 
+    if (cmd.id.type && val.type !== cmd.id.type) {
+      // used dummy node for now, lazy pass node
+      const dummyNode : es.Node = { type: 'Literal', value: null } 
+      throw new rttc.TypeError(dummyNode, " as assigned value", cmd.id.type, val.type) 
+    } 
     if (cmd.frameOffset && E.tail) {
-      return (E.tail.head[cmd.sym] = S.peek())
+      return (E.tail.head[cmd.id.sym] = S.peek())
     }
-    E.head[cmd.sym] = S.peek()
+    E.head[cmd.id.sym] = S.peek()
   },
   list_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const list = []

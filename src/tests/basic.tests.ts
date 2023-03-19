@@ -631,3 +631,35 @@ describe('local', () => {
     })
   })
 })
+
+/**
+ * TYPE ANNOTATIONS
+ */
+
+describe('type annotations', () => {
+  test('annotation matches value assigned', () => {
+    const code: string = 'val x : int = 4'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual(4)
+    })
+  })
+
+  test('annotation does not match value assigned', () => {
+    const code: string = 'val x : int = true'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected int as assigned value, got boolean.')
+    })
+  })
+
+  test('value assigned is computed', () => {
+    const code: string = `
+      val a : int = 4; 
+      val b = true; 
+      val c : string = "hello"; 
+      val result : string = if (b) then c else a; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual('hello')
+    })
+  })
+})
