@@ -347,6 +347,10 @@ const microcode: { [tag: string]: Function } = {
       const expr = cmd.body[i]
       expr['isCheck'] = cmd.isCheck
       A.push(expr)
+      if (i === 0) {
+        continue 
+      }
+      A.push({ tag: 'pop_i' })
     }
   },
   lit: (cmd: { val: any; isCheck: boolean }) => {
@@ -403,8 +407,6 @@ const microcode: { [tag: string]: Function } = {
     localDecs: any
     isCheck: boolean
   }) => {
-    // A.push({ tag: 'lit', val: undefined })
-    // A.push({ tag: 'pop_i'})
     for (let i = cmd.exprs.length - 1; i >= 0; i--) {
       if (cmd.localStartIdx !== null && i === cmd.localStartIdx + cmd.localArity - 1) {
         // restores the original env after 'local...in...end' is evaluated
@@ -419,6 +421,10 @@ const microcode: { [tag: string]: Function } = {
         frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0,
         isCheck: cmd.isCheck
       })
+
+      if (i !== 0) {
+        A.push({ tag: 'pop_i' })
+      }
 
       if (cmd.localStartIdx !== null && i === cmd.localStartIdx) {
         // extend current env to temporarily store local declarations (i.e. 'local<THESE>in...end')
@@ -536,6 +542,11 @@ const microcode: { [tag: string]: Function } = {
     isCheck: boolean
   }) => {
     A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
+    // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
+    // cmd.cons['isCheck'] = cmd.isCheck 
+    // cmd.alt['isCheck'] = cmd.isCheck 
+    // A.push(cmd.cons)
+    // A.push(cmd.alt)
     cmd.pred['isCheck'] = cmd.isCheck
     A.push(cmd.pred)
   },
@@ -667,16 +678,31 @@ const microcode: { [tag: string]: Function } = {
       return
     }
 
+    // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
+    // const consVal = S.pop() 
+    // const altVal = S.pop() 
+    // if (rttc.isTypeEqual(consVal.type, altVal.type)) {
+    //   throw Error(`Match rules disagree on type: Cannot merge '${consVal.type}' and '${altVal.type}'`)
+    // }
+
     const pred = S.pop()
     const error = rttc.checkIfStatement(cmd.node, pred)
     if (error) {
       throw error
     }
 
+    // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
+    // A.push({
+    //   tag: 'lit', 
+    //   val: pred.value ? consVal.value : altVal.value 
+    // })
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
   closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
     S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
+  },
+  pop_i: () => {
+    S.pop() 
   }
 }
 // tslint:enable:object-literal-shorthand
