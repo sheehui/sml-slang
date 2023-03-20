@@ -293,42 +293,42 @@ describe('binop', () => {
  */
 describe('fun declaration', () => {
   test('basic fun declaration', () => {
-    const code: string = 'fun test x = x + 1; test(1);'
+    const code: string = 'fun test (x: int) : int = x + 1; test(1);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(2)
     })
   })
 
   test('fun declaration with let expr', () => {
-    const code: string = 'fun test x = let val y = 2; in x + y; end; test(1);'
+    const code: string = 'fun test (x : int) : int = let val y : int = 2; in x + y; end; test(1);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(3)
     })
   })
 
   test('fun declaration with nested fun declaration', () => {
-    const code: string = 'fun test x = let fun test2 y = y + x; in test2(2); end; test(1);'
+    const code: string = 'fun test (x: int) : int = let fun test2 (y : int) : int = y + x; in test2(2); end; test(1);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(3)
     })
   })
 
   test('unbound variable in fun declaration', () => {
-    const code: string = 'fun test x = x + y;'
+    const code: string = 'fun test (x : int) : int = x + y;'
     return runInContext(code, context, options).catch(error => {
       expect(error.message).toMatch('Unbound variable y')
     })
   })
 
   test('unbound variable in nested fun declaration', () => {
-    const code: string = 'fun test x = let fun test2 y = y + x + z; in test2(2); end; test(1);'
+    const code: string = 'fun test (x : int) : int = let fun test2 (y: int) : int = y + x + z; in test2(2); end; test(1);'
     return runInContext(code, context, options).catch(error => {
       expect(error.message).toMatch('Unbound variable z')
     })
   })
 
   test('fun declaration supports recursive call', () => {
-    const code: string = 'fun test x = if x > 0 then test(x - 1) else 10; test(3);'
+    const code: string = 'fun test (x : int) : int = if x > 0 then test(x - 1) else 10; test(3);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(10)
     })
@@ -340,56 +340,56 @@ describe('fun declaration', () => {
  */
 describe('lambdas', () => {
   test('basic lambda', () => {
-    const code: string = '(fn x => x + 1)(1);'
+    const code: string = '(fn (x : int) => x + 1)(1);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(2)
     })
   })
 
   test('lambda with multiple params', () => {
-    const code: string = '(fn (x, y, z) => x + y + z)(1, 2, 3);'
+    const code: string = '(fn (x : int, y: int, z: int) => x + y + z)(1, 2, 3);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(6)
     })
   })
 
   test('lambda with let expr', () => {
-    const code: string = '(fn x => let val y = 2; in x + y; end)(1);'
+    const code: string = '(fn (x : int) => let val y : int = 2; in x + y; end)(1);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(3)
     })
   })
 
   test('lambda with nested lambda', () => {
-    const code: string = '(fn x => (fn y => y + x)(2)) (1);'
+    const code: string = '(fn (x : int) => (fn (y : int)=> y + x)(2)) (1);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(3)
     })
   })
 
   test('unbound variable in lambda', () => {
-    const code: string = 'fn x => x + y;'
+    const code: string = 'fn (x : int) => x + y;'
     return runInContext(code, context, options).catch(error => {
       expect(error.message).toMatch('Unbound variable y')
     })
   })
 
   test('unbound variable in nested lambda', () => {
-    const code: string = '(fn x => (fn y => y + x + z)(2)) (1);'
+    const code: string = '(fn (x : int) => (fn (y : int) => y + x + z)(2)) (1);'
     return runInContext(code, context, options).catch(error => {
       expect(error.message).toMatch('Unbound variable z')
     })
   })
 
   test('lambda variable declaration', () => {
-    const code: string = 'val test = fn x => (fn y => y + x)(2); test(1)'
+    const code: string = 'val test : int -> int = fn (x : int) => (fn (y : int) => y + x)(2); test(1)'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(3)
     })
   })
 
   test('lambda variable declaration does not support recursive call', () => {
-    const code: string = `val test = fn x => 
+    const code: string = `val test : int -> int = fn (x : int) => 
                             if x > 0 
                               then test(x - 1) 
                               else 10; 
@@ -405,7 +405,7 @@ describe('lambdas', () => {
  */
 describe('val rec', () => {
   test("recursive declaration without 'rec' is not allowed", () => {
-    const code: string = `val test = fn x => 
+    const code: string = `val test : int -> int = fn (x : int) => 
                             if (x > 0) 
                               then test(x - 1)
                               else 200; 
@@ -416,7 +416,7 @@ describe('val rec', () => {
   })
 
   test("recursive declaration with 'rec' is allowed", () => {
-    const code: string = `val rec test = fn x => 
+    const code: string = `val rec test : int -> int = fn (x : int) => 
                             if (x > 0) 
                               then test(x - 1)
                               else 200; 
@@ -429,7 +429,7 @@ describe('val rec', () => {
   test('within local declaration', () => {
     const code: string = `
                           let 
-                            val rec test = fn x => 
+                            val rec test : int -> int = fn (x : int) => 
                             if (x > 0) 
                               then test(x - 1)
                               else 200; 
@@ -443,9 +443,9 @@ describe('val rec', () => {
 
   test('within fun declaration', () => {
     const code: string = `
-                          fun hello y = 
+                          fun hello (y : int) : int = 
                             let 
-                              val rec test = fn x => 
+                              val rec test : int -> int = fn (x : int) => 
                               if (x > 0) 
                                 then test(x - 1)
                                 else 200; 
@@ -460,9 +460,9 @@ describe('val rec', () => {
 
   test('within rec lambda', () => {
     const code: string = `
-                          val rec hello = fn y => 
+                          val rec hello : int -> int = fn (y : int) => 
                             let 
-                              val rec test = fn x => 
+                              val rec test : int -> int = fn (x : int) => 
                               if (x > 0) 
                                 then test(x - 1)
                                 else 200; 
@@ -483,9 +483,9 @@ describe('local', () => {
   test('local with var dec', () => {
     const code: string = `
       local 
-        val x = 1; 
+        val x : int = 1; 
       in 
-        val y = x + 1; 
+        val y : int = x + 1; 
       end; 
       y; 
     `
@@ -497,10 +497,10 @@ describe('local', () => {
   test('local with fun', () => {
     const code: string = `
       local 
-        val x = 1;
-        fun z n = n + 3; 
+        val x : int = 1;
+        fun z (n: int) : int = n + 3; 
       in 
-        fun test n = n + x + z(x)
+        fun test (n : int) : int = n + x + z(x)
       end; 
       test(5); 
     `
@@ -512,10 +512,10 @@ describe('local', () => {
   test('local with var lambda', () => {
     const code: string = `
       local 
-        val x = 1;
-        val z = fn n => n + 3; 
+        val x : int = 1;
+        val z : int -> int = fn (n : int) => n + 3; 
       in 
-        val test = fn n => n + x + z(x)
+        val test : int -> int = fn (n : int) => n + x + z(x)
       end; 
       test(5); 
     `
@@ -527,12 +527,12 @@ describe('local', () => {
   test('local with recursive', () => {
     const code: string = `
       local 
-        val rec test = fn x => 
+        val rec test : int -> int = fn (x : int) => 
         if (x > 0) 
           then test(x - 1)
           else 200;
       in 
-        val x = test(3) + 1; 
+        val x : int = test(3) + 1; 
       end; 
       x; 
     `
@@ -544,13 +544,13 @@ describe('local', () => {
   test('local with multiple dec', () => {
     const code: string = `
       local 
-        val x = 1;
-        val y = 2; 
-        val z = fn n => n + 3; 
+        val x : int = 1;
+        val y : int = 2; 
+        val z : int -> int = fn (n : int) => n + 3; 
       in 
-        val a = x + y; 
-        val b = z(y); 
-        fun c n = n + a + b; 
+        val a : int = x + y; 
+        val b : int = z(y); 
+        fun c (n : int) : int = n + a + b; 
       end; 
       c(2); 
     `
@@ -561,14 +561,14 @@ describe('local', () => {
 
   test('local decs can access vars outside block', () => {
     const code: string = `
-      val x = 1; 
-      val y = 2; 
+      val x : int = 1; 
+      val y : int = 2; 
       local 
-        val z = fn n => n + 3 + x; 
+        val z : int -> int = fn (n : int) => n + 3 + x; 
       in 
-        val a = x + y; 
-        val b = z(y); 
-        fun c n = n + a + b; 
+        val a : int = x + y; 
+        val b : int = z(y); 
+        fun c (n : int) : int = n + a + b; 
       end; 
       c(2); 
     `
@@ -579,13 +579,13 @@ describe('local', () => {
 
   test('local decs should override vars outside block', () => {
     const code: string = `
-      val x = 1; 
-      val y = 2; 
+      val x : int = 1; 
+      val y : int = 2; 
       local 
-        val x = 11; 
-        val y = 22; 
+        val x : int = 11; 
+        val y : int = 22; 
       in 
-        val z = x + y; 
+        val z : int = x + y; 
       end; 
       z; 
     `
@@ -597,9 +597,9 @@ describe('local', () => {
   test('local decs are inaccessible outside of the block', () => {
     const code: string = `
       local 
-        val x = 1; 
+        val x : int = 1; 
       in 
-        val y = x + 1; 
+        val y : int = x + 1; 
       end; 
       x; 
     `
@@ -612,16 +612,16 @@ describe('local', () => {
     const code: string = `
       local 
         local
-          val x = 1;  
+          val x : int = 1;  
         in
-          val y = fn n => x + n; 
+          val y : int -> int = fn (n: int) => x + n; 
         end; 
-        val z = y(1);  
+        val z : int = y(1);  
       in 
         local 
-          val a = z + 3;
+          val a : int = z + 3;
         in 
-          fun b n = a * n; 
+          fun b (n: int) : int = a * n; 
         end; 
       end; 
       b(2); 
@@ -660,6 +660,64 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual('hello')
+    })
+  })
+
+  test('fun dec return type does not match', () => {
+    const code: string = `
+      fun test (x : int) : int = x > 6; 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected int,int,fun as assigned value, got int,boolean,fun.')
+    })
+  })
+
+  test('fun dec arg type does not match', () => {
+    const code: string = `
+      fun test (x : int) : int = x + 6; test(true);
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected int as argument to function, got boolean.')
+    })
+  })
+
+  test('lambda return type does not match', () => {
+    const code: string = `
+      val test : bool -> bool = fn (x : bool) => if x then 4 else 5; 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected boolean,boolean,fun as assigned value, got boolean,int,fun.')
+    })
+  })
+
+  test('lambda param type does not match', () => {
+    const code: string = `
+      val test : int -> bool = fn (x : bool) => if x then 4 else 5; 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected int,boolean,fun as assigned value, got boolean,int,fun.')
+    })
+  })
+
+  test('nested types', () => {
+    const code: string = `
+      val a : int -> int = fn (x: int) => x + 1; 
+      fun test (x: int -> int) : int -> bool = fn (y : int) => y > x(1);
+      test(a) (5); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual(true)
+    })
+  })
+
+  test('nested types lambda', () => {
+    const code: string = `
+      val a : int -> int = fn (x: int) => x + 1; 
+      val test : int -> int -> (int -> bool) = fn (x: int -> int) => fn (y : int) => y > x(1); 
+      test(a) (5); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual(true)
     })
   })
 })

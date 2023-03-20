@@ -84,6 +84,23 @@ export const isTypeEqual = (left: TypedValue, right: TypedValue): boolean => {
   }
 }
 
+export const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
+  if (typeof left === 'string' && typeof right === 'string') {
+    return left === right 
+  } else if (typeof left !== 'string' && typeof right !== 'string') {
+    if (left.length !== right.length) {
+      return false 
+    }
+    for (let i = 0; i < left.length; i++) {
+      if (!typeArrEqual(left[i], right[i])) {
+        return false 
+      }
+    }
+    return true 
+  }
+  return false 
+}
+
 const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
   if (isTypedList(superset) && isTypedList(subset)) {
     return isFreeList(superset)
@@ -114,7 +131,8 @@ const getTypeString = (val: TypedValue | string): string => {
   } else if (isTypedTuple(val)) {
     return typeArrToString(val.typeArr!)
   } else {
-    return val.type
+    return `${val.type}` // temporary fix
+    // return val.type.toString()
   }
 }
 
@@ -399,6 +417,34 @@ export const checkBinaryExpression = (
       return checkAppendExpression(node, left, right)
     default:
       return
+  }
+}
+
+export const operatorToResultType = (
+  operator: es.BinaryOperator | es.UnaryOperator | '@' | '::'
+) : SmlType => {
+  switch (operator) {
+    case '^':
+      return 'string'
+    case '+':
+    case '-':
+    case '*':
+    case '/':
+    case '%':
+      return 'int'
+    case '<':
+    case '<=':
+    case '>':
+    case '>=':
+    case '!==':
+    case '===':
+      return 'boolean'
+    case '::':
+      return 'list'
+    case '@':
+      return 'list'
+    default:
+      return "'a"
   }
 }
 

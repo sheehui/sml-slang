@@ -354,16 +354,15 @@ const microcode: { [tag: string]: Function } = {
     }
   },
   lit: (cmd: { val: any; isCheck: boolean }) => {
-    if (!cmd.isCheck) {
-      return S.push(rttc.getTypedLiteral(cmd.val))
-    }
+    S.push(rttc.getTypedLiteral(cmd.val))
   },
   id: (cmd: { sym: string; isCheck: boolean }) => {
     let env: Environment | null = E
     while (env) {
       const frame = env.head
       if (frame.hasOwnProperty(cmd.sym)) {
-        return !cmd.isCheck && S.push(frame[cmd.sym])
+        // return !cmd.isCheck && S.push(frame[cmd.sym])
+        return S.push(frame[cmd.sym])
       }
       env = env.tail
     }
@@ -376,26 +375,22 @@ const microcode: { [tag: string]: Function } = {
     loc: es.SourceLocation
     isCheck: boolean
   }) => {
-    if (!cmd.isCheck) {
-      A.push({
-        tag: 'binop_i',
-        sym: cmd.sym,
-        loc: cmd.loc
-      })
-    }
+    A.push({
+      tag: cmd.isCheck ? 'binop_check_i' : 'binop_i',
+      sym: cmd.sym,
+      loc: cmd.loc
+    })
     cmd.frst['isCheck'] = cmd.isCheck
     cmd.scnd['isCheck'] = cmd.isCheck
     A.push(cmd.frst)
     A.push(cmd.scnd)
   },
   unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation; isCheck: boolean }) => {
-    if (!cmd.isCheck) {
-      A.push({
-        tag: 'unop_i',
-        sym: cmd.sym,
-        loc: cmd.loc
-      })
-    }
+    A.push({
+      tag: cmd.isCheck ? 'unop_check_i' : 'unop_i',
+      sym: cmd.sym,
+      loc: cmd.loc
+    })
     cmd.arg['isCheck'] = cmd.isCheck
     A.push(cmd.arg)
   },
@@ -448,9 +443,9 @@ const microcode: { [tag: string]: Function } = {
     A.push(cmd.expr)
   },
   lam: (cmd: { params: any[]; body: es.BlockStatement; id: any }) => {
-    A.push({ tag: 'closure_i', params: cmd.params.map(param => param.sym), body: cmd.body, env: E })
+    A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E })
 
-    // check vars within function
+    // check vars + types within function
     if (A.size() > 0) {
       A.push({ tag: 'env_i', env: E })
     }
@@ -460,10 +455,10 @@ const microcode: { [tag: string]: Function } = {
 
     // extend environment by 1 frame for block
     const head = {}
-    cmd.params.forEach(param => (head[param.sym] = null))
+    cmd.params.forEach(param => (head[param.sym] = {type: param.type, value: null}))
     if (cmd.id) {
       // allows recursive functions (for 'fun' declarations only)
-      head[cmd.id.sym] = null
+      head[cmd.id.sym] = {type: cmd.id.type, value: null}
     }
     E = {
       head,
@@ -524,9 +519,7 @@ const microcode: { [tag: string]: Function } = {
     }
   },
   app: (cmd: { args: any[]; fun: any; isCheck: boolean }) => {
-    if (!cmd.isCheck) {
-      A.push({ tag: 'app_i', arity: cmd.args.length })
-    }
+    A.push({ tag: 'app_i', arity: cmd.args.length, isCheck: cmd.isCheck })
     for (let i = 0; i < cmd.args.length; i++) {
       cmd.args[i]['isCheck'] = cmd.isCheck
       A.push(cmd.args[i])
@@ -556,20 +549,44 @@ const microcode: { [tag: string]: Function } = {
     const result = binaryOp(cmd.sym, left, right, cmd.loc)
     S.push(rttc.getTypedLiteral(result))
   },
+  binop_check_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
+    const right = S.pop()
+    const left = S.pop()
+    // check if types match operator 
+    const dummyNode : es.Node = { type: 'Literal', value: null } 
+    const typeError = rttc.checkBinaryExpression(dummyNode, cmd.sym, left, right)
+    if (typeError) {
+      throw typeError 
+    }
+    // push some dummy object containing type onto stack 
+    S.push({ type: rttc.operatorToResultType(cmd.sym), value: null })
+  },
   unop_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
     const arg = S.pop()
     const result = unaryOp(cmd.sym, arg, cmd.loc)
     S.push(rttc.getTypedLiteral(result))
+  },
+  unop_check_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
+    const arg = S.pop()
+    // check if type match operator 
+    const dummyNode : es.Node = { type: 'Literal', value: null } 
+    const typeError = rttc.checkUnaryExpression(dummyNode, cmd.sym, arg)
+    if (typeError) {
+      throw typeError 
+    }
+    // push some dummy object containing type onto stack 
+    S.push({ type: rttc.operatorToResultType(cmd.sym), value: null })
   },
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env
   },
   assmt_i: (cmd: { id: any; frameOffset: number }) => {
     const val = S.peek() 
-    if (cmd.id.type && val.type !== cmd.id.type) {
+    if (cmd.id.type && !rttc.typeArrEqual(val.type, cmd.id.type)) {
+      console.log("HERE TYPE ERROR ")
       // used dummy node for now, lazy pass node
       const dummyNode : es.Node = { type: 'Literal', value: null } 
-      throw new rttc.TypeError(dummyNode, " as assigned value", cmd.id.type, val.type) 
+      throw new rttc.TypeError(dummyNode, " as assigned value", cmd.id.type.toString(), val.type.toString()) 
     } 
     if (cmd.frameOffset && E.tail) {
       return (E.tail.head[cmd.id.sym] = S.peek())
@@ -646,12 +663,37 @@ const microcode: { [tag: string]: Function } = {
 
     S.push(rttc.getTypedTupleElem(tuple, cmd.index))
   },
-  app_i: (cmd: { arity: number }) => {
+  app_i: (cmd: { arity: number, isCheck: boolean }) => {
     const args = []
     for (let i = 0; i < cmd.arity; i++) {
       args.push(S.pop())
     }
-    const func = S.pop()
+    let func = S.pop()
+
+    // check func params type match 
+    const dummyNode : es.Node = { type: 'Literal', value: null } 
+    const paramsTypes = func.type[0]
+    if (typeof paramsTypes === 'string') {
+      if (args.length > 1 || !rttc.typeArrEqual(args[0].type, paramsTypes as SmlType)) {
+        throw new rttc.TypeError(dummyNode, " as argument to function", paramsTypes, args[0].type)
+      }
+    } else {
+      const argsTypes = args.length > 1 
+        ? args.reduce((x, y) => {
+          x.push(y.type)
+          return x 
+        }, [])
+        : args[0].type
+      if (!rttc.typeArrEqual(argsTypes, paramsTypes)) {
+        throw new rttc.TypeError(dummyNode, " as argument to function", paramsTypes, argsTypes)
+      }
+    }
+
+    if (cmd.isCheck) {
+      return S.push({ type: func.type[1], value: null })
+    }
+
+    func = func.value
 
     // TODO: Implement tail call
     A.push({ tag: 'env_i', env: E })
@@ -699,7 +741,22 @@ const microcode: { [tag: string]: Function } = {
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
   closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
-    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
+    // for now, parameter types are all given 
+    let paramsTypes = []
+    for (let i = 0; i < cmd.params.length; i++) {
+      const curr = cmd.params[i]
+      paramsTypes.push(curr.type)
+    }
+    if (paramsTypes.length === 1) {
+      paramsTypes = paramsTypes[0] // if only 1 param, not a tuple so take out type from array 
+    } 
+    const retType = S.pop().type // type of function body is on the stash after checks 
+
+    S.push({
+      type: [paramsTypes, retType, 'fun'], 
+      value: { tag: 'closure', params: cmd.params.map(param => param.sym), body: cmd.body, env: cmd.env }
+    })
+    // S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
   },
   pop_i: () => {
     S.pop() 

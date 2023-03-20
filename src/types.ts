@@ -256,9 +256,16 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
-export type SmlType = 'boolean' | 'int' | 'string' | 'list' | 'tuple' | "'a"
+export type SmlType = 'boolean' | 'int' | 'string' | 'list' | 'tuple' | "'a" | 'fun' | Array<SmlType> 
 
-export type SmlValue = string | number | boolean
+export interface SmlClosure {
+  tag: 'closure',
+  params: Array<string>,
+  body: any, 
+  env: Environment
+}
+
+export type SmlValue = string | number | boolean | SmlClosure
 
 export interface TypedValue {
   type: SmlType

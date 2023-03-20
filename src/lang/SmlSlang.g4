@@ -103,13 +103,13 @@ seqDecl
 
 declaration
    : VAL REC? identifier=pattern EQUAL value=expression           # VarDec
-   | FUN identifier=ID params=pattern EQUAL value=expression      # FunDec
+   | FUN identifier=ID params=pattern (':' retType=type)? EQUAL value=expression      # FunDec
    | LOCAL localDecs=seqDecl IN decs=seqDecl END                  # LocalDecs
    ;
 
 type 
    : TYPE                                                         # LitType
-   | listType=type TYPE                                         # ListType 
+   | listType=type TYPE                                           # ListType 
    | '(' inner=type ')'                                           # TypeParens
    | left=type MUL right=type                                     # TupleType
    | left=type TYPARR right=type                                  # FuncType
