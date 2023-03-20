@@ -12,7 +12,6 @@ import {
   AddSubContext,
   AppendContext,
   BooleanContext,
-  BoolTypeContext,
   ConcatContext,
   ConditionalContext,
   ConstructContext,
@@ -26,9 +25,9 @@ import {
   FunDecContext,
   IdentifierContext,
   InequalityContext,
-  IntTypeContext,
   ListContext,
   ListTypeContext,
+  LitTypeContext,
   LocalDecContext,
   LocalDecsContext,
   NegationContext,
@@ -47,7 +46,6 @@ import {
   StartContext,
   StmtContext,
   StringContext,
-  StrTypeContext,
   TupleAccessContext,
   TupleContext,
   TupleTypeContext,
@@ -574,17 +572,19 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
 }
 
 class TypeGenerator implements SmlSlangVisitor<SmlType> {
-  visitIntType(ctx: IntTypeContext) : SmlType {
-    return 'int'
-  }
-  visitBoolType(ctx: BoolTypeContext) : SmlType {
-    return 'boolean'
-  }
-  visitStrType(ctx: StrTypeContext) : SmlType {
-    return 'string'
+  visitLitType(ctx: LitTypeContext) : SmlType {
+    const type = ctx.TYPE()._symbol.text; 
+    if (type === 'bool') {
+      return 'boolean'
+    }
+    return type as SmlType 
   }
   visitListType(ctx: ListTypeContext) : SmlType {
     // i.e. int list, int list list, (int * bool) list, 
+    const type = ctx.TYPE()._symbol.text; 
+    if (type !== 'list') {
+      throw Error(`expecting type 'list' but got type ${type}`)
+    }
     throw Error('not supported yet')
   }
   visitTypeParens(ctx: TypeParensContext) : SmlType {
@@ -678,9 +678,10 @@ class StmtGenerator implements SmlSlangVisitor<es.Statement> {
 
 class PatternGenerator implements SmlSlangVisitor<es.Pattern[]> {
   visitPattId(ctx: PattIdContext): es.Pattern[] {
+    const nameToken = ctx.ID() ? ctx.ID() : ctx.TYPE() 
     const id : es.Pattern = {
       type: 'Identifier',
-      name: ctx.ID()?.text!
+      name: nameToken?.text!
     }
     
     id['valType'] = ctx.type() 

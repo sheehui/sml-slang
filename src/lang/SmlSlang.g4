@@ -45,6 +45,7 @@ REC: 'rec';
 NUMBER: DIGIT+;
 TUPLE_ACCESS: HASH [1-9] DIGIT*;
 STRING: '"' (~["])+ '"';
+TYPE: 'int' | 'bool' | 'string' | 'list'; 
 ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
 WHITESPACE: [ \r\n\t]+ -> skip;
 
@@ -61,7 +62,7 @@ stmt
    ; 
 
 expression
-   : ID                                                              # Identifier
+   : (ID | TYPE)                                                              # Identifier
    | STRING                                                          # String
    | NUMBER                                                          # Number
    | BOOLEAN                                                         # Boolean
@@ -107,10 +108,8 @@ declaration
    ;
 
 type 
-   : 'int'                                                        # IntType
-   | 'bool'                                                       # BoolType
-   | 'string'                                                     # StrType 
-   | listType=type 'list'                                         # ListType 
+   : TYPE                                                         # LitType
+   | listType=type TYPE                                         # ListType 
    | '(' inner=type ')'                                           # TypeParens
    | left=type MUL right=type                                     # TupleType
    | left=type TYPARR right=type                                  # FuncType
@@ -118,7 +117,7 @@ type
 
 pattern
    : WILDC (':' valType=type)?                                    # PattWildc
-   | ID (':' valType=type)?                                       # PattId
+   | (ID | TYPE) (':' valType=type)?                              # PattId
    | NUMBER (':' valType=type)?                                   # PattNum
    | BOOLEAN (':' valType=type)?                                  # PattBool
    | '(' ( pattern ( ',' pattern )* )? ')'                        # PattTuple
