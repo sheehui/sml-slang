@@ -770,13 +770,46 @@ describe('type annotations', () => {
     })
   })
 
-  test('mismatch should throw error', () => {
+  test('mismatch tuple types should throw error', () => {
     const code: string = `
       val x : ((int * bool) * bool) = ((1,true),3); 
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
         'Expected ((int * boolean) * boolean) as assigned value, got ((int * boolean) * int).'
+      )
+    })
+  })
+
+  test('list types', () => {
+    const code: string = `
+      val x : int list = [1,2,3];
+      val y : bool list = [true, false, true];
+      val z : string list = ["hello", "bye"]; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual(["hello", "bye"])
+    })
+  })
+
+  test('nested list types', () => {
+    const code: string = `
+      val x : (int list list * bool list) list = [([[1], [2]], [true]), ([[3]], [false, true])];
+      val y : bool list list = [[true], [false], [true]];
+      val z : int list list list = [[[1], [2]]];
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[[1], [2]]])
+    })
+  })
+
+  test('mismatch list types should throw error', () => {
+    const code: string = `
+    val x : (int list * bool list) list = [([[1], [2]], [true]), ([[3]], [false, true])];
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch(
+        'Expected (int list * boolean list) list as assigned value, got (int list list * boolean list) list.'
       )
     })
   })

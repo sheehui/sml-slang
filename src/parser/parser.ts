@@ -599,7 +599,13 @@ class TypeGenerator implements SmlSlangVisitor<SmlType> {
     if (type !== 'list') {
       throw Error(`expecting type 'list' but got type ${type}`)
     }
-    throw Error('not supported yet')
+    const listType = ctx._listType.accept(this)
+    if (Array.isArray(listType) && listType[listType.length - 1] === 'list') {
+      listType.push(type) 
+      return listType
+    } else {
+      return [listType, type]
+    }
   }
   visitTypeParens(ctx: TypeParensContext): SmlType {
     return ctx._inner.accept(this)
