@@ -270,12 +270,17 @@ export const getTypedLiteral = (val: any): TypedValue => {
   }
 }
 
-export const getTypedTupleElem = (val: any, index: number): TypedValue => {
+export const getTypedTupleElem = (node: es.Node, val: any, index: number): TypedValue => {
   if (index < 0 || index >= val.value.length) {
     throw Error('index out of bounds')
   }
+
+  if (!isTypedTuple(val)) {
+    throw new TypeError(node, '', 'a tuple', val)
+  }
+
   const value = val.value[index]
-  const type = val.typle[index]
+  const type = val.type[index]
   return {
     type,
     value

@@ -188,13 +188,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   MemberExpression: function* (node: es.MemberExpression, context: Context) {
-    const expr = node.object.type === "ArrayExpression" 
-            ? yield* evaluators[node.object.type](node.object, context)
-            : node.object
+    const expr = yield* evaluators[node.object.type](node.object, context)
+            
     return {
       tag: 'record',
       record: node.property,
-      expr
+      expr,
+      node
     }
   },
 
@@ -504,17 +504,15 @@ const microcode: { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  record: (cmd: { record: any; expr: any; isCheck: boolean }) => {
+  record: (cmd: { record: any; expr: any; node: es.MemberExpression; isCheck: boolean }) => {
     const index = cmd.record.value - 1 // input is 1-indexed
-    !cmd.isCheck && A.push({ tag: 'record_i', index })
-
-    if (cmd.expr.tag === 'tuple_lit') {
-      cmd.expr['isCheck'] = cmd.isCheck
-      A.push(cmd.expr)
-    }
+    !cmd.isCheck && A.push({ tag: 'record_i', index, node: cmd.node })
 
     if (cmd.expr.type === 'Identifier') {
       A.push({ tag: 'id', sym: cmd.expr.name, isCheck: cmd.isCheck })
+    } else {
+      cmd.expr['isCheck'] = cmd.isCheck
+      A.push(cmd.expr)
     }
   },
   app: (cmd: { args: any[]; fun: any; isCheck: boolean }) => {
@@ -639,9 +637,9 @@ const microcode: { [tag: string]: Function } = {
     type.push('tuple')
     S.push({ type: type, value: tuple })
   },
-  record_i: (cmd: { index: number }) => {
+  record_i: (cmd: { index: number; node: es.MemberExpression }) => {
     const tuple = S.pop()
-    S.push(rttc.getTypedTupleElem(tuple, cmd.index))
+    S.push(rttc.getTypedTupleElem(cmd.node, tuple, cmd.index))
   },
   app_i: (cmd: { arity: number; isCheck: boolean }) => {
     const args = []
