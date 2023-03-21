@@ -631,19 +631,11 @@ const microcode: { [tag: string]: Function } = {
       tuple.push(elem.value)
       type.push(rttc.getElemType(elem))
     }
-    S.push({ type: 'tuple', typeArr: type, value: tuple })
+    type.push('tuple')
+    S.push({ type: type, value: tuple })
   },
   record_i: (cmd: { index: number }) => {
     const tuple = S.pop()
-
-    if (tuple.type !== 'tuple') {
-      throw Error('# can only be used on tuples')
-    }
-
-    if (cmd.index < 0 || cmd.index >= tuple.value.length) {
-      throw Error('index out of bounds')
-    }
-
     S.push(rttc.getTypedTupleElem(tuple, cmd.index))
   },
   app_i: (cmd: { arity: number }) => {
