@@ -152,18 +152,22 @@ export const typeToString = (type: SmlType) : string => {
 
     return str.trim()
   } else if (isTypeArr && type[type.length - 1] == 'tuple') {
-    let str = ''
+    let str = '('
 
     for (let i = 0; i < type.length - 1; i++) {
       const element = type[i]
+      if (i !== 0) {
+        str += " * "
+      }
       if (Array.isArray(element)) {
-        str += ' * ' + typeToString(element)
+        str += typeToString(element)
       } else {
-        str += ' * ' + element
+        str += element
       }
     }
+    str += ')'
 
-    return str.substring(3)
+    return str
   } else if (isTypeArr && type[type.length - 1] == 'fun') {
     const paramsType = Array.isArray(type[0]) ? typeToString(type[0]) : type[0]
     const retType = Array.isArray(type[1]) ? typeToString(type[1]) : type[1]

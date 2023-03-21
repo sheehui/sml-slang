@@ -714,7 +714,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'Expected int * int * int as argument to function, got int * int.'
+        'Expected (int * int * int) as argument to function, got (int * int).'
       )
     })
   })
@@ -749,6 +749,35 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual(true)
+    })
+  })
+
+  test('tuple types', () => {
+    const code: string = `
+      val x : (int * int * int) = (1,2,3); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([1,2,3])
+    })
+  })
+
+  test('nested tuple types', () => {
+    const code: string = `
+      val x : ((int * int) * int) = ((1,2),3); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([[1,2],3])
+    })
+  })
+
+  test('mismatch should throw error', () => {
+    const code: string = `
+      val x : ((int * bool) * bool) = ((1,true),3); 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch(
+        'Expected ((int * boolean) * boolean) as assigned value, got ((int * boolean) * int).'
+      )
     })
   })
 })

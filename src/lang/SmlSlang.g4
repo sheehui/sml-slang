@@ -111,7 +111,7 @@ type
    : TYPE                                                         # LitType
    | listType=type TYPE                                           # ListType 
    | '(' inner=type ')'                                           # TypeParens
-   | left=type MUL right=type                                     # TupleType
+   | '(' type ( MUL type )+ ')'                                   # TupleType
    | left=type TYPARR right=type                                  # FuncType
    ;
 

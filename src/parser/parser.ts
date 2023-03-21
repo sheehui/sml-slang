@@ -612,7 +612,9 @@ class TypeGenerator implements SmlSlangVisitor<SmlType> {
   }
   visitTupleType(ctx: TupleTypeContext): SmlType {
     // i.e. int * bool * int
-    throw Error('not supported yet')
+    const types = ctx.type().map(type => type.accept(this))
+    types.push('tuple')
+    return types
   }
 
   visit(tree: ParseTree): SmlType {
