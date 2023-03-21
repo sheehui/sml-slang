@@ -599,23 +599,6 @@ const microcode: { [tag: string]: Function } = {
     const right = S.pop()
     const result = binaryOp('@', left, right, cmd.loc)
     S.push(rttc.getAppendedTypedList(left, right, result))
-    // const list = []
-    // let first = undefined
-    // //TODO: check both is list + same type
-    // for (let i = 0; i < cmd.len; i++) {
-    //   const elem = S.pop()
-    //   if (elem.value.length === 0) {
-    //     continue
-    //   }
-    //   if (first === undefined) {
-    //     first = elem.value[0]
-    //   }
-    //   if (!rttc.isTypeEqual(first, elem)) {
-    //     throw new rttc.TypeError(cmd.node, ' as list element to append @', first, elem)
-    //   }
-    //   list.push(...elem.value)
-    // }
-    // S.push(rttc.getTypedList(first, list))
   },
   list_construct_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     const left = S.pop()

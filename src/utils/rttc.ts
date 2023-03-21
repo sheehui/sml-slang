@@ -131,7 +131,7 @@ const typeArrToString = (arr: SmlType[]) => {
     })
 
     return str.trim()
-  } else {
+  } else if (arr[arr.length - 1] == 'tuple') {
     let str = ''
 
     for(let i = 0; i < arr.length - 1; i++) {
@@ -144,6 +144,8 @@ const typeArrToString = (arr: SmlType[]) => {
     }
 
     return str.substring(3)
+  } else {
+    return arr[0].toString()
   }
 }
 
@@ -244,14 +246,6 @@ export const getTypedLiteral = (val: any): TypedValue => {
   }
 }
 
-const getType = (type: any) => {
-  if (Array.isArray(type)) {
-    return type[type.length - 1] === 'list' ? 'list' : 'tuple'
-  } else {
-    return type
-  }
-}
-
 export const getTypedTupleElem = (val: any, index: number) : TypedValue => {
   if (index < 0 || index >= val.value.length) {
     throw Error('index out of bounds')
@@ -263,12 +257,6 @@ export const getTypedTupleElem = (val: any, index: number) : TypedValue => {
     value
   }
 }
-
-// export const getListElemType = (v: TypedValue) => {
-//   const type = v.typeArr
-//   type?.pop()
-//   return type
-// }
 
 export const getElemType = (v: TypedValue) => {
   return v.type
