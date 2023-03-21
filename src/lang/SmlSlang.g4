@@ -73,7 +73,6 @@ expression
 
    | '(' inner=expression ')'                                        # Parentheses
    | '(' ( expression ( ',' expression )* )? ')'                     # Tuple
-   | record=TUPLE_ACCESS expr=expression                             # TupleAccess
 
    | '[' ( expression ( ',' expression )* )? ']'                     # List
    | <assoc=right> expression DCOLON expression                      # Construct
@@ -91,6 +90,8 @@ expression
 
    | IF pred=expression THEN cons=expression ELSE alt=expression     # Conditional
    | LET decl=seqDecl IN expr=seqExpr END                            # LocalDec
+
+   | record=TUPLE_ACCESS expr=expression                             # TupleAccess
    ;
 
 seqExpr
