@@ -258,11 +258,11 @@ export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefine
 
 export type SmlType = 'boolean' | 'int' | 'string' | 'list' | 'tuple' | "'a" | Array<SmlType>
 
-export type SmlValue = string | number | boolean
+export type SmlValue = string | number | boolean | Array<SmlValue>
 
 export interface TypedValue {
   type: SmlType
-  value: SmlValue | Array<SmlValue>
+  value: SmlValue
 }
 
 export type TSAllowedTypes = 'any' | 'void'
