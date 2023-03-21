@@ -348,7 +348,7 @@ const microcode: { [tag: string]: Function } = {
       expr['isCheck'] = cmd.isCheck
       A.push(expr)
       if (i === 0) {
-        continue 
+        continue
       }
       A.push({ tag: 'pop_i' })
     }
@@ -536,8 +536,8 @@ const microcode: { [tag: string]: Function } = {
   }) => {
     A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
     // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
-    // cmd.cons['isCheck'] = cmd.isCheck 
-    // cmd.alt['isCheck'] = cmd.isCheck 
+    // cmd.cons['isCheck'] = cmd.isCheck
+    // cmd.alt['isCheck'] = cmd.isCheck
     // A.push(cmd.cons)
     // A.push(cmd.alt)
     cmd.pred['isCheck'] = cmd.isCheck
@@ -616,23 +616,6 @@ const microcode: { [tag: string]: Function } = {
     const right = S.pop()
     const result = binaryOp('@', left, right, cmd.loc)
     S.push(rttc.getAppendedTypedList(left, right, result))
-    // const list = []
-    // let first = undefined
-    // //TODO: check both is list + same type
-    // for (let i = 0; i < cmd.len; i++) {
-    //   const elem = S.pop()
-    //   if (elem.value.length === 0) {
-    //     continue
-    //   }
-    //   if (first === undefined) {
-    //     first = elem.value[0]
-    //   }
-    //   if (!rttc.isTypeEqual(first, elem)) {
-    //     throw new rttc.TypeError(cmd.node, ' as list element to append @', first, elem)
-    //   }
-    //   list.push(...elem.value)
-    // }
-    // S.push(rttc.getTypedList(first, list))
   },
   list_construct_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     const left = S.pop()
@@ -648,19 +631,11 @@ const microcode: { [tag: string]: Function } = {
       tuple.push(elem.value)
       type.push(rttc.getElemType(elem))
     }
-    S.push({ type: 'tuple', typeArr: type, value: tuple })
+    type.push('tuple')
+    S.push({ type: type, value: tuple })
   },
   record_i: (cmd: { index: number }) => {
     const tuple = S.pop()
-
-    if (tuple.type !== 'tuple') {
-      throw Error('# can only be used on tuples')
-    }
-
-    if (cmd.index < 0 || cmd.index >= tuple.value.length) {
-      throw Error('index out of bounds')
-    }
-
     S.push(rttc.getTypedTupleElem(tuple, cmd.index))
   },
   app_i: (cmd: { arity: number, isCheck: boolean }) => {
@@ -721,8 +696,8 @@ const microcode: { [tag: string]: Function } = {
     }
 
     // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
-    // const consVal = S.pop() 
-    // const altVal = S.pop() 
+    // const consVal = S.pop()
+    // const altVal = S.pop()
     // if (rttc.isTypeEqual(consVal.type, altVal.type)) {
     //   throw Error(`Match rules disagree on type: Cannot merge '${consVal.type}' and '${altVal.type}'`)
     // }
@@ -735,8 +710,8 @@ const microcode: { [tag: string]: Function } = {
 
     // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
     // A.push({
-    //   tag: 'lit', 
-    //   val: pred.value ? consVal.value : altVal.value 
+    //   tag: 'lit',
+    //   val: pred.value ? consVal.value : altVal.value
     // })
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
@@ -759,7 +734,7 @@ const microcode: { [tag: string]: Function } = {
     // S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
   },
   pop_i: () => {
-    S.pop() 
+    S.pop()
   }
 }
 // tslint:enable:object-literal-shorthand

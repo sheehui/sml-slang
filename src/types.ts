@@ -265,12 +265,11 @@ export interface SmlClosure {
   env: Environment
 }
 
-export type SmlValue = string | number | boolean | SmlClosure
+export type SmlValue = string | number | boolean | SmlClosure | Array<SmlValue>
 
 export interface TypedValue {
   type: SmlType
-  typeArr?: Array<SmlType>
-  value: SmlValue | Array<SmlValue>
+  value: SmlValue
 }
 
 export type TSAllowedTypes = 'any' | 'void'

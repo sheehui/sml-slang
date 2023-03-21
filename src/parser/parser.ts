@@ -457,13 +457,13 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
 class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
     const init = new ExpressionGenerator().visit(ctx._value) // variable value
-    const pat: es.Pattern[] = new PatternGenerator().visit(ctx._identifier) 
+    const pat: es.Pattern[] = new PatternGenerator().visit(ctx._identifier)
 
     if (pat.length > 1) {
-      // pattern matching 
-      throw Error("not supported yet") 
+      // pattern matching
+      throw Error('not supported yet')
     }
-    const id = pat[0] 
+    const id = pat[0]
 
     if (ctx.REC() && init.type === 'FunctionExpression' && id.type === 'Identifier') {
       // 'rec' can only be specified for lambdas
@@ -471,7 +471,7 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
       // var dec will basically behave like a 'fun' dec
       init.id = id
     }
-    const declarator : es.VariableDeclarator = {
+    const declarator: es.VariableDeclarator = {
       type: 'VariableDeclarator',
       id,
       init
@@ -588,22 +588,22 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
 }
 
 class TypeGenerator implements SmlSlangVisitor<SmlType> {
-  visitLitType(ctx: LitTypeContext) : SmlType {
-    const type = ctx.TYPE()._symbol.text; 
+  visitLitType(ctx: LitTypeContext): SmlType {
+    const type = ctx.TYPE()._symbol.text
     if (type === 'bool') {
       return 'boolean'
     }
-    return type as SmlType 
+    return type as SmlType
   }
-  visitListType(ctx: ListTypeContext) : SmlType {
-    // i.e. int list, int list list, (int * bool) list, 
-    const type = ctx.TYPE()._symbol.text; 
+  visitListType(ctx: ListTypeContext): SmlType {
+    // i.e. int list, int list list, (int * bool) list,
+    const type = ctx.TYPE()._symbol.text
     if (type !== 'list') {
       throw Error(`expecting type 'list' but got type ${type}`)
     }
     throw Error('not supported yet')
   }
-  visitTypeParens(ctx: TypeParensContext) : SmlType {
+  visitTypeParens(ctx: TypeParensContext): SmlType {
     return ctx._inner.accept(this)
   }
   visitFuncType(ctx: FuncTypeContext) : SmlType {
@@ -612,15 +612,15 @@ class TypeGenerator implements SmlSlangVisitor<SmlType> {
     const returnType = ctx._right.accept(this) 
     return [paramType, returnType, 'fun'] 
   }
-  visitTupleType(ctx: TupleTypeContext) : SmlType {
+  visitTupleType(ctx: TupleTypeContext): SmlType {
     // i.e. int * bool * int
     throw Error('not supported yet')
   }
 
   visit(tree: ParseTree): SmlType {
-    return tree.accept(this) 
+    return tree.accept(this)
   }
-  
+
   visitChildren(node: RuleNode): SmlType {
     return node.accept(this)
   }
@@ -642,7 +642,7 @@ class TypeGenerator implements SmlSlangVisitor<SmlType> {
         }
       },
       `invalid syntax ${node.text}`
-    ) 
+    )
   }
 }
 
@@ -696,27 +696,23 @@ class StmtGenerator implements SmlSlangVisitor<es.Statement> {
 
 class PatternGenerator implements SmlSlangVisitor<es.Pattern[]> {
   visitPattId(ctx: PattIdContext): es.Pattern[] {
-    const nameToken = ctx.ID() ? ctx.ID() : ctx.TYPE() 
-    const id : es.Pattern = {
+    const nameToken = ctx.ID() ? ctx.ID() : ctx.TYPE()
+    const id: es.Pattern = {
       type: 'Identifier',
       name: nameToken?.text!
     }
-    
-    id['valType'] = ctx.type() 
-      ? ctx.type()?.accept(new TypeGenerator()) 
-      : undefined
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
     return [id]
   }
 
   visitPattWildc(ctx: PattWildcContext): es.Pattern[] {
-    const id : es.Pattern = {
+    const id: es.Pattern = {
       type: 'Identifier',
       name: '_'
     }
-    
-    id['valType'] = ctx.type() 
-      ? ctx.type()?.accept(new TypeGenerator()) 
-      : undefined
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
     return [id]
   }
 
@@ -727,26 +723,22 @@ class PatternGenerator implements SmlSlangVisitor<es.Pattern[]> {
   }
 
   visitPattNum(ctx: PattNumContext): es.Pattern[] {
-    const id : es.Pattern = {
+    const id: es.Pattern = {
       type: 'Identifier',
       name: '_'
     }
-    
-    id['valType'] = ctx.type() 
-      ? ctx.type()?.accept(new TypeGenerator()) 
-      : undefined
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
     return [id]
   }
 
   visitPattBool(ctx: PattBoolContext): es.Pattern[] {
-    const id : es.Pattern = {
+    const id: es.Pattern = {
       type: 'Identifier',
       name: '_'
     }
-    
-    id['valType'] = ctx.type() 
-      ? ctx.type()?.accept(new TypeGenerator()) 
-      : undefined
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
     return [id]
   }
 

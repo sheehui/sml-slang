@@ -44,17 +44,18 @@ const isTypedNumber = (v: TypedValue) => v.type === 'int'
 const isTypedString = (v: TypedValue) => v.type === 'string'
 const isTypedBool = (v: TypedValue) => v.type === 'boolean'
 const isFreeLiteral = (v: TypedValue) => v.type === "'a"
-const isTypedList = (v: TypedValue) => v.type === 'list' && Array.isArray(v.value) && v.typeArr
-const isFreeList = (v: TypedValue) => isTypedList(v) && v.typeArr![0] === "'a"
-const isTypedTuple = (v: TypedValue) => v.type === 'tuple' && Array.isArray(v.value) && v.typeArr
+const isTypedList = (v: TypedValue) =>
+  Array.isArray(v.type) && v.type[v.type.length - 1] === 'list' && Array.isArray(v.value)
+const isFreeList = (v: TypedValue) => isTypedList(v) && v.type[0] === "'a"
+const isTypedTuple = (v: TypedValue) =>
+  Array.isArray(v.type) && v.type[v.type.length - 1] === 'tuple' && Array.isArray(v.value)
 const isListOrTuple = (v: TypedValue) => isTypedList(v) || isTypedTuple(v)
 
 const getListDepth = (v: TypedValue) => {
   if (isTypedList(v)) {
     let depth = 0
-    const typeArr = v.typeArr!
-    for (let i = typeArr.length - 1; i >= 0; i--) {
-      if (typeArr[i] === 'list') {
+    for (let i = v.type.length - 1; i >= 0; i--) {
+      if (v.type[i] === 'list') {
         depth++
       } else {
         break
@@ -78,7 +79,7 @@ const typeOf = (v: Value) => {
 
 export const isTypeEqual = (left: TypedValue, right: TypedValue): boolean => {
   if ((isTypedList(left) && isTypedList(right)) || (isTypedTuple(left) && isTypedTuple(right))) {
-    return left.typeArr?.toString() === right.typeArr?.toString()
+    return left.type.toString() === right.type.toString()
   } else {
     return left.type === right.type
   }
@@ -126,13 +127,13 @@ const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
 const getTypeString = (val: TypedValue | string): string => {
   if (typeof val === 'string') {
     return val
-  } else if (isTypedList(val)) {
-    return typeArrToString(val.typeArr!)
-  } else if (isTypedTuple(val)) {
-    return typeArrToString(val.typeArr!)
+  } else if (Array.isArray(val.type)) {
+    if (isTypedList(val) || isTypedTuple(val)) {
+      return typeArrToString(val.type)
+    }
+    throw Error('Unable to get type of non-list/tuple array for SmlType.type')
   } else {
-    return `${val.type}` // temporary fix
-    // return val.type.toString()
+    return val.type
   }
 }
 
@@ -149,18 +150,21 @@ const typeArrToString = (arr: SmlType[]) => {
     })
 
     return str.trim()
-  } else {
+  } else if (arr[arr.length - 1] == 'tuple') {
     let str = ''
 
-    arr.forEach((element: SmlType | Array<SmlType>) => {
+    for (let i = 0; i < arr.length - 1; i++) {
+      const element = arr[i]
       if (Array.isArray(element)) {
         str += ' * ' + typeArrToString(element)
       } else {
         str += ' * ' + element
       }
-    })
+    }
 
     return str.substring(3)
+  } else {
+    return arr[0].toString()
   }
 }
 
@@ -185,60 +189,56 @@ export const updateListType = (
 export const getDeclaredTypedList = (first: TypedValue | undefined, val: any): TypedValue => {
   if (first === undefined) {
     return {
-      type: 'list',
-      typeArr: ["'a", 'list'],
+      type: ["'a", 'list'],
       value: []
     }
   } else {
-    const typeArr = isListOrTuple(first) ? first.typeArr! : [first.type]
+    const typeArr = isTypedList(first) ? first.type : [first.type]
+
+    if (!Array.isArray(typeArr)) {
+      throw Error('Cannot push to a non array type.')
+    }
+
     typeArr.push('list')
 
     return {
-      type: 'list',
-      typeArr: typeArr,
+      type: typeArr,
       value: val
     }
   }
 }
 
-export const getConstructedTypedList = (
-  left: TypedValue,
-  right: TypedValue,
-  val: any
-): TypedValue => {
-  let typeArr = right.typeArr!
+export const getConstructedTypedList = (left: any, right: any, val: any): TypedValue => {
+  let typeArr = right.type
 
   if (isFreeList(right)) {
     if (!isFreeList(left)) {
       // assign a fixed type
-      typeArr[0] = isTypedList(left) ? left.typeArr![0] : left.type
+      typeArr[0] = isTypedList(left) ? left.type[0] : left.type
       if (isTypedList(left)) {
         typeArr.push('list')
       }
     } else if (getListDepth(right) <= getListDepth(left)) {
-      typeArr = left.typeArr!
+      typeArr = left.type
       typeArr.push('list')
     }
   }
 
   return {
-    type: 'list',
-    typeArr: typeArr,
+    type: typeArr,
     value: val
   }
 }
 
-export const getAppendedTypedList = (left: TypedValue, right: TypedValue, val: any): TypedValue => {
-  let typeArr = left.typeArr!
+export const getAppendedTypedList = (left: any, right: any, val: any): TypedValue => {
+  let typeArr = left.type
 
   if (isFreeList(left)) {
-    typeArr =
-      isFreeList(right) && getListDepth(left) < getListDepth(right) ? right.typeArr! : left.typeArr!
+    typeArr = isFreeList(right) && getListDepth(left) < getListDepth(right) ? right.type : left.type
   }
 
   return {
-    type: 'list',
-    typeArr: typeArr,
+    type: typeArr,
     value: val
   }
 }
@@ -252,8 +252,7 @@ export const getTypedLiteral = (val: any): TypedValue => {
     return { type: 'int', value: val }
   } else if (isNil(val)) {
     return {
-      type: 'list',
-      typeArr: ["'a", 'list'],
+      type: ["'a", 'list'],
       value: []
     }
   } else {
@@ -261,36 +260,20 @@ export const getTypedLiteral = (val: any): TypedValue => {
   }
 }
 
-const getType = (type: any) => {
-  if (Array.isArray(type)) {
-    return type[type.length - 1] === 'list' ? 'list' : 'tuple'
-  } else {
-    return type
+export const getTypedTupleElem = (val: any, index: number): TypedValue => {
+  if (index < 0 || index >= val.value.length) {
+    throw Error('index out of bounds')
   }
-}
-
-export const getTypedTupleElem = (val: any, index: number) => {
-  const elem = val.value[index]
-  const type = getType(val.typeArr[index])
+  const value = val.value[index]
+  const type = val.typle[index]
   return {
     type,
-    typeArr: type === 'list' || type === 'tuple' ? val.typeArr[index] : undefined,
-    value: elem
+    value
   }
 }
 
-// export const getListElemType = (v: TypedValue) => {
-//   const type = v.typeArr
-//   type?.pop()
-//   return type
-// }
-
 export const getElemType = (v: TypedValue) => {
-  if (isListOrTuple(v)) {
-    return v?.typeArr
-  } else {
-    return v.type
-  }
+  return v.type
 }
 
 export const checkUnaryExpression = (
@@ -311,7 +294,7 @@ const isTypeArrEqual = (expected: Array<SmlType>, got: Array<SmlType>) => {
   return expected.toString() === got.toString()
 }
 
-const checkConstructExpression = (node: es.Node, left: TypedValue, right: TypedValue) => {
+const checkConstructExpression = (node: es.Node, left: any, right: any) => {
   if (!isTypedList(right)) {
     // right side needs to be some list
     return new TypeError(node, RHS, 'list', right)
@@ -323,9 +306,9 @@ const checkConstructExpression = (node: es.Node, left: TypedValue, right: TypedV
   }
 
   // For valid ::, LHS type must match elem type of list in RHS
-  const rightTypeArr: Array<SmlType> = right.typeArr!
+  const rightTypeArr: Array<SmlType> = right.type
   const expectedTypeArr: Array<SmlType> = rightTypeArr.slice(0, rightTypeArr.length - 1)
-  const gotTypeArr: Array<SmlType> = isListOrTuple(left) ? left.typeArr! : [left.type]
+  const gotTypeArr: Array<SmlType> = isListOrTuple(left) ? left.type : [left.type]
 
   if (!isTypeArrEqual(gotTypeArr, expectedTypeArr)) {
     return new TypeError(node, LHS, typeArrToString(expectedTypeArr), typeArrToString(gotTypeArr))
