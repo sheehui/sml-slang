@@ -40,7 +40,7 @@ describe('tuple access', () => {
   })
 
   test('valid access with identifier', () => {
-    const code: string = 'val x : int*int = (3, 5); #2 x;'
+    const code: string = 'val x : (int*int) = (3, 5); #2 x;'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(5)
     })
