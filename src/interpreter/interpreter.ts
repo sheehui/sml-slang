@@ -348,7 +348,7 @@ const microcode: { [tag: string]: Function } = {
       expr['isCheck'] = cmd.isCheck
       A.push(expr)
       if (i === 0) {
-        continue 
+        continue
       }
       A.push({ tag: 'pop_i' })
     }
@@ -543,8 +543,8 @@ const microcode: { [tag: string]: Function } = {
   }) => {
     A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
     // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
-    // cmd.cons['isCheck'] = cmd.isCheck 
-    // cmd.alt['isCheck'] = cmd.isCheck 
+    // cmd.cons['isCheck'] = cmd.isCheck
+    // cmd.alt['isCheck'] = cmd.isCheck
     // A.push(cmd.cons)
     // A.push(cmd.alt)
     cmd.pred['isCheck'] = cmd.isCheck
@@ -565,12 +565,12 @@ const microcode: { [tag: string]: Function } = {
     E = cmd.env
   },
   assmt_i: (cmd: { id: any; frameOffset: number }) => {
-    const val = S.peek() 
+    const val = S.peek()
     if (cmd.id.type && val.type !== cmd.id.type) {
       // used dummy node for now, lazy pass node
-      const dummyNode : es.Node = { type: 'Literal', value: null } 
-      throw new rttc.TypeError(dummyNode, " as assigned value", cmd.id.type, val.type) 
-    } 
+      const dummyNode: es.Node = { type: 'Literal', value: null }
+      throw new rttc.TypeError(dummyNode, ' as assigned value', cmd.id.type, val.type)
+    }
     if (cmd.frameOffset && E.tail) {
       return (E.tail.head[cmd.id.sym] = S.peek())
     }
@@ -654,8 +654,8 @@ const microcode: { [tag: string]: Function } = {
     }
 
     // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
-    // const consVal = S.pop() 
-    // const altVal = S.pop() 
+    // const consVal = S.pop()
+    // const altVal = S.pop()
     // if (rttc.isTypeEqual(consVal.type, altVal.type)) {
     //   throw Error(`Match rules disagree on type: Cannot merge '${consVal.type}' and '${altVal.type}'`)
     // }
@@ -668,8 +668,8 @@ const microcode: { [tag: string]: Function } = {
 
     // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
     // A.push({
-    //   tag: 'lit', 
-    //   val: pred.value ? consVal.value : altVal.value 
+    //   tag: 'lit',
+    //   val: pred.value ? consVal.value : altVal.value
     // })
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
@@ -677,7 +677,7 @@ const microcode: { [tag: string]: Function } = {
     S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
   },
   pop_i: () => {
-    S.pop() 
+    S.pop()
   }
 }
 // tslint:enable:object-literal-shorthand
