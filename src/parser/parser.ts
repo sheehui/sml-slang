@@ -479,16 +479,14 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
     return [declarator]
   }
   visitFunDec(ctx: FunDecContext): es.VariableDeclarator[] {
-    const params: es.Pattern[] = new PatternGenerator().visit(ctx._params) 
-    const retType : SmlType = ctx._retType 
-      ? ctx._retType.accept(new TypeGenerator()) 
-      : "'a"
+    const params: es.Pattern[] = new PatternGenerator().visit(ctx._params)
+    const retType: SmlType = ctx._retType ? ctx._retType.accept(new TypeGenerator()) : "'a"
 
-    // get type of function 
-    let paramsType : SmlType | SmlType[] = [] 
+    // get type of function
+    let paramsType: SmlType | SmlType[] = []
     for (let i = 0; i < params.length; i++) {
-      const curr : es.Pattern = params[i]
-      paramsType.push(curr['valType'] ? curr['valType'] : "'a") 
+      const curr: es.Pattern = params[i]
+      paramsType.push(curr['valType'] ? curr['valType'] : "'a")
     }
     if (paramsType.length === 1) {
       paramsType = paramsType[0]
@@ -606,11 +604,11 @@ class TypeGenerator implements SmlSlangVisitor<SmlType> {
   visitTypeParens(ctx: TypeParensContext): SmlType {
     return ctx._inner.accept(this)
   }
-  visitFuncType(ctx: FuncTypeContext) : SmlType {
-    // i.e. int -> int, (int * int) -> bool 
+  visitFuncType(ctx: FuncTypeContext): SmlType {
+    // i.e. int -> int, (int * int) -> bool
     const paramType = ctx._left.accept(this)
-    const returnType = ctx._right.accept(this) 
-    return [paramType, returnType, 'fun'] 
+    const returnType = ctx._right.accept(this)
+    return [paramType, returnType, 'fun']
   }
   visitTupleType(ctx: TupleTypeContext): SmlType {
     // i.e. int * bool * int

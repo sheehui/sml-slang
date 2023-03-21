@@ -307,7 +307,8 @@ describe('fun declaration', () => {
   })
 
   test('fun declaration with nested fun declaration', () => {
-    const code: string = 'fun test (x: int) : int = let fun test2 (y : int) : int = y + x; in test2(2); end; test(1);'
+    const code: string =
+      'fun test (x: int) : int = let fun test2 (y : int) : int = y + x; in test2(2); end; test(1);'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(3)
     })
@@ -321,7 +322,8 @@ describe('fun declaration', () => {
   })
 
   test('unbound variable in nested fun declaration', () => {
-    const code: string = 'fun test (x : int) : int = let fun test2 (y: int) : int = y + x + z; in test2(2); end; test(1);'
+    const code: string =
+      'fun test (x : int) : int = let fun test2 (y: int) : int = y + x + z; in test2(2); end; test(1);'
     return runInContext(code, context, options).catch(error => {
       expect(error.message).toMatch('Unbound variable z')
     })
@@ -382,7 +384,8 @@ describe('lambdas', () => {
   })
 
   test('lambda variable declaration', () => {
-    const code: string = 'val test : int -> int = fn (x : int) => (fn (y : int) => y + x)(2); test(1)'
+    const code: string =
+      'val test : int -> int = fn (x : int) => (fn (y : int) => y + x)(2); test(1)'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toBe(3)
     })
@@ -668,7 +671,9 @@ describe('type annotations', () => {
       fun test (x : int) : int = x > 6; 
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int,int,fun as assigned value, got int,boolean,fun.')
+      expect(error.explain()).toMatch(
+        'Expected int -> int as assigned value, got int -> boolean.'
+      )
     })
   })
 
@@ -686,7 +691,9 @@ describe('type annotations', () => {
       val test : bool -> bool = fn (x : bool) => if x then 4 else 5; 
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected boolean,boolean,fun as assigned value, got boolean,int,fun.')
+      expect(error.explain()).toMatch(
+        'Expected boolean -> boolean as assigned value, got boolean -> int.'
+      )
     })
   })
 
@@ -695,7 +702,31 @@ describe('type annotations', () => {
       val test : int -> bool = fn (x : bool) => if x then 4 else 5; 
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int,boolean,fun as assigned value, got boolean,int,fun.')
+      expect(error.explain()).toMatch(
+        'Expected int -> boolean as assigned value, got boolean -> int.'
+      )
+    })
+  })
+
+  test('lambda multiple params type does not match', () => {
+    const code: string = `
+      (fn (x : int, y: int, z: int) => x + y + z)(1, 2); 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch(
+        'Expected int * int * int as argument to function, got int * int.'
+      )
+    })
+  })
+
+  test('func application type does not match', () => {
+    const code: string = `
+      val test : bool = (fn (x : int, y: int, z: int) => x + y + z)(1, 2, 3); 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch(
+        'Expected boolean as assigned value, got int.'
+      )
     })
   })
 

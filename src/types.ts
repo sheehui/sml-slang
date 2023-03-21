@@ -256,12 +256,20 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
-export type SmlType = 'boolean' | 'int' | 'string' | 'list' | 'tuple' | "'a" | 'fun' | Array<SmlType> 
+export type SmlType =
+  | 'boolean'
+  | 'int'
+  | 'string'
+  | 'list'
+  | 'tuple'
+  | "'a"
+  | 'fun'
+  | Array<SmlType>
 
 export interface SmlClosure {
-  tag: 'closure',
-  params: Array<string>,
-  body: any, 
+  tag: 'closure'
+  params: Array<string>
+  body: any
   env: Environment
 }
 
@@ -276,7 +284,7 @@ export type TSAllowedTypes = 'any' | 'void'
 
 export const disallowedTypes = ['bigint', 'never', 'object', 'symbol', 'unknown'] as const
 
-export type TSDisallowedTypes = (typeof disallowedTypes)[number]
+export type TSDisallowedTypes = typeof disallowedTypes[number]
 
 // All types recognised by type parser as basic types
 export type TSBasicType = PrimitiveType | TSAllowedTypes | TSDisallowedTypes
