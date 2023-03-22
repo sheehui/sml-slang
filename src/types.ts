@@ -256,14 +256,28 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
-export type SmlType = 'boolean' | 'null' | 'int' | 'string' | 'undefined' | 'list' | 'tuple' 
+export type SmlType =
+  | 'boolean'
+  | 'int'
+  | 'string'
+  | 'list'
+  | 'tuple'
+  | "'a"
+  | 'fun'
+  | Array<SmlType>
 
-export type SmlValue = string | number | boolean
+export interface SmlClosure {
+  tag: 'closure'
+  params: Array<string>
+  body: any
+  env: Environment
+}
+
+export type SmlValue = string | number | boolean | SmlClosure | Array<SmlValue>
 
 export interface TypedValue {
   type: SmlType
-  typeArr?: Array<SmlType>
-  value: SmlValue| Array<SmlValue>
+  value: SmlValue
 }
 
 export type TSAllowedTypes = 'any' | 'void'
@@ -393,34 +407,34 @@ export type TypeEnvironment = {
 }[]
 
 interface IStack<T> {
-  push(item: T): void;
-  pop(): T | undefined;
-  peek(): T | undefined;
-  size(): number;
+  push(item: T): void
+  pop(): T | undefined
+  peek(): T | undefined
+  size(): number
 }
 
 export class Stack<T> implements IStack<T> {
-  private storage: T[] = [];
+  private storage: T[] = []
 
   constructor(private capacity: number = Infinity) {}
 
   push(item: T): void {
     if (this.size() === this.capacity) {
-      throw Error("Stack has reached max capacity, you cannot add more items");
+      throw Error('Stack has reached max capacity, you cannot add more items')
     }
-    this.storage.push(item);
+    this.storage.push(item)
   }
 
   pop(): T | undefined {
-    return this.storage.pop();
+    return this.storage.pop()
   }
 
   peek(): T | undefined {
-    return this.storage[this.size() - 1];
+    return this.storage[this.size() - 1]
   }
 
   size(): number {
-    return this.storage.length;
+    return this.storage.length
   }
 
   print(): void {

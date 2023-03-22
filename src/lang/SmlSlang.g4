@@ -3,11 +3,11 @@ grammar SmlSlang;
 /*
  * Tokens (terminal)
  */
-POW: '^';
+CONCAT: '^';
 MUL: '*';
 HASH: '#';
-APPEND: '::';
-MERGE: '@';
+DCOLON: '::';
+AMPERSAND: '@';
 DIV: 'div';
 ADD: '+';
 SUB: '-';
@@ -35,8 +35,7 @@ END: 'end';
 FUN: 'fun';
 FN: 'fn'; 
 LAMARR: '=>'; 
-WHILE: 'while';
-DO: 'do';
+TYPARR: '->'; 
 SEMIC: ';'; 
 WILDC: '_'; 
 NIL: 'nil'; 
@@ -44,6 +43,7 @@ REC: 'rec';
 NUMBER: DIGIT+;
 TUPLE_ACCESS: HASH [1-9] DIGIT*;
 STRING: '"' (~["])+ '"';
+TYPE: 'int' | 'bool' | 'string' | 'list'; 
 ID: [a-zA-Z] ([a-zA-Z] | [0-9] | '\'' | '_' )*;
 WHITESPACE: [ \r\n\t]+ -> skip;
 
@@ -60,41 +60,36 @@ stmt
    ; 
 
 expression
-   : ID                                                           # Identifier
-   | STRING                                                       # String
-   | NUMBER                                                       # Number
-   | BOOLEAN                                                      # Boolean
-   | NIL                                                          # Nil
+   : (ID | TYPE)                                                                  # Identifier
+   | STRING                                                                       # String
+   | NUMBER                                                                       # Number
+   | BOOLEAN                                                                      # Boolean
+   | NIL                                                                          # Nil
 
-   | FN params=pattern LAMARR (expression)                          # FuncExpr
-   | callee=expression '(' ( expression ( ',' expression )* )? ')'        # FuncApp
-   | '(' inner=expression ')'                                     # Parentheses
-   | '(' ( expression ( ',' expression )* )? ')'                  # Tuple
-   | record=TUPLE_ACCESS expr=expression                          # TupleAccess
+   | FN params=pattern LAMARR (expression)                                        # FuncExpr
+   | callee=expression '(' ( expression ( ',' expression )* )? ')'                # FuncApp
 
-   | '[' ( expression ( ',' expression )* )? ']'                  # List
-   | expression (APPEND expression)+                              # Append
-   | expression (MERGE expression)+                               # Merge
-
-   | operator=NEG right=expression                                # Negation
-   | operator=NOT right=expression                                # Not
-
-   | left=expression operator=POW right=expression                # Power
-   | left=expression operator=MUL right=expression                # Multiplication
-   | left=expression operator=DIV right=expression                # Division
-   | left=expression operator=ADD right=expression                # Addition
-   | left=expression operator=SUB right=expression                # Subtraction
-   | left=expression operator=MOD right=expression                # Modulo
+   | '(' inner=expression ')'                                                     # Parentheses
    
-   | left=expression operator=GT right=expression                 # GreaterThan
-   | left=expression operator=GTE right=expression                # GreaterThanOrEqual
-   | left=expression operator=LT right=expression                 # LessThan
-   | left=expression operator=LTE right=expression                # LessThanOrEqual 
-   | left=expression operator=EQUAL right=expression              # Equal
-   | left=expression operator=NEQUAL right=expression             # Nequal
+   | '(' ( expression ( ',' expression )* )? ')'                                  # Tuple
+   | '[' ( expression ( ',' expression )* )? ']'                                  # List
 
-   | IF pred=expression THEN cons=expression ELSE alt=expression  # Conditional
-   | LET decl=seqDecl IN expr=seqExpr END                         # LocalDec
+   | operator=NEG right=expression                                                # Negation
+   | left=expression operator=(MUL | DIV | MOD) right=expression                  # Factor
+   | left=expression operator=(ADD | SUB) right=expression                        # AddSub
+   
+   | left=expression operator=CONCAT right=expression                             # Concat
+
+   | operator=NOT right=expression                                                # Not
+   | left=expression operator=(GT | GTE | LT | LTE) right=expression              # Inequality
+   | left=expression operator=(EQUAL | NEQUAL) right=expression                   # Equality
+
+   | <assoc=right> left=expression operator=(DCOLON | AMPERSAND) right=expression # ListOps
+
+   | IF pred=expression THEN cons=expression ELSE alt=expression                  # Conditional
+   | LET decl=seqDecl IN expr=seqExpr END                                         # LocalDec
+
+   | record=TUPLE_ACCESS expr=expression                                          # TupleAccess
    ;
 
 seqExpr
@@ -106,15 +101,23 @@ seqDecl
    ;
 
 declaration
-   : VAL REC?  identifier=ID EQUAL value=expression                     # VarDec
-   | FUN identifier=ID params=pattern EQUAL value=expression      # FunDec
+   : VAL REC? identifier=pattern EQUAL value=expression           # VarDec
+   | FUN identifier=ID params=pattern (':' retType=type)? EQUAL value=expression      # FunDec
    | LOCAL localDecs=seqDecl IN decs=seqDecl END                  # LocalDecs
    ;
 
+type 
+   : TYPE                                                         # LitType
+   | listType=type TYPE                                           # ListType 
+   | '(' inner=type ')'                                           # TypeParens
+   | '(' type ( MUL type )+ ')'                                   # TupleType
+   | left=type TYPARR right=type                                  # FuncType
+   ;
+
 pattern
-   : WILDC                                                        # PattWildc
-   | ID                                                           # PattId
-   | NUMBER                                                       # PattNum
-   | BOOLEAN                                                      # PattBool
+   : WILDC (':' valType=type)?                                    # PattWildc
+   | (ID | TYPE) (':' valType=type)?                              # PattId
+   | NUMBER (':' valType=type)?                                   # PattNum
+   | BOOLEAN (':' valType=type)?                                  # PattBool
    | '(' ( pattern ( ',' pattern )* )? ')'                        # PattTuple
    ; 

@@ -1,15 +1,9 @@
-import { BinaryOperator, SourceLocation,UnaryOperator } from 'estree'
+import { BinaryOperator, SourceLocation, UnaryOperator } from 'estree'
 
 import { LazyBuiltIn } from '../createContext'
-import {
-  CallingNonFunctionValue,
-  ExceptionError,
-  GetInheritedPropertyError,
-  InvalidNumberOfArguments
-} from '../errors/errors'
+import { CallingNonFunctionValue, ExceptionError, InvalidNumberOfArguments } from '../errors/errors'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Thunk, TypedValue } from '../types'
-import { locationDummyNode } from './astCreator'
 import * as create from './astCreator'
 import { makeWrapper } from './makeWrapper'
 import * as rttc from './rttc'
@@ -127,7 +121,7 @@ export function boolOrErr(candidate: any, line: number, column: number) {
 
 export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocation) {
   argument = forceIt(argument)
-  const line = loc.start.line;
+  const line = loc.start.line
   const column = loc.start.column
   const error = rttc.checkUnaryExpression(
     create.locationDummyNode(line, column),
@@ -152,7 +146,7 @@ export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
 }
 
 export function binaryOp(
-  operator: BinaryOperator,
+  operator: BinaryOperator | '::' | '@',
   left: TypedValue,
   right: TypedValue,
   loc: SourceLocation
@@ -174,7 +168,7 @@ export function binaryOp(
   }
 }
 
-export function evaluateBinaryExpression(operator: BinaryOperator, left: any, right: any) {
+export function evaluateBinaryExpression(operator: BinaryOperator | string, left: any, right: any) {
   const l = left.value
   const r = right.value
   switch (operator) {
@@ -201,8 +195,13 @@ export function evaluateBinaryExpression(operator: BinaryOperator, left: any, ri
       return l > r
     case '>=':
       return l >= r
+    case '::':
+      return [l].concat(r)
+    case '@':
+      l.push(...r)
+      return l
     default:
-      return Error("Invalid binary operator " + operator)
+      return Error('Invalid binary operator ' + operator)
   }
 }
 

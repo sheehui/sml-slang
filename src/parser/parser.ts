@@ -1,5 +1,6 @@
 /* tslint:disable:max-classes-per-file */
 import { CharStreams, CommonTokenStream } from 'antlr4ts'
+import { Token } from 'antlr4ts/Token'
 import { ErrorNode } from 'antlr4ts/tree/ErrorNode'
 import { ParseTree } from 'antlr4ts/tree/ParseTree'
 import { RuleNode } from 'antlr4ts/tree/RuleNode'
@@ -8,54 +9,50 @@ import * as es from 'estree'
 
 import { SmlSlangLexer } from '../lang/SmlSlangLexer'
 import {
-  AdditionContext,
-  AppendContext,
+  AddSubContext,
   BooleanContext,
+  ConcatContext,
   ConditionalContext,
   DeclarationContext,
-  DivisionContext,
-  EqualContext,
+  EqualityContext,
   ExpressionContext,
+  FactorContext,
   FuncAppContext,
   FuncExprContext,
+  FuncTypeContext,
   FunDecContext,
-  GreaterThanContext,
-  GreaterThanOrEqualContext,
   IdentifierContext,
-  LessThanContext,
-  LessThanOrEqualContext,
+  InequalityContext,
   ListContext,
+  ListOpsContext,
+  ListTypeContext,
+  LitTypeContext,
   LocalDecContext,
   LocalDecsContext,
-  MergeContext,
-  ModuloContext,
-  MultiplicationContext,
   NegationContext,
-  NequalContext,
   NilContext,
   NotContext,
   NumberContext,
   ParenthesesContext,
   PattBoolContext,
-  PatternContext,
   PattIdContext,
   PattNumContext,
   PattTupleContext,
   PattWildcContext,
-  PowerContext,
   SeqDeclContext,
   SeqExprContext,
   SmlSlangParser,
   StartContext,
   StmtContext,
   StringContext,
-  SubtractionContext,
   TupleAccessContext,
   TupleContext,
+  TupleTypeContext,
+  TypeParensContext,
   VarDecContext
 } from '../lang/SmlSlangParser'
 import { SmlSlangVisitor } from '../lang/SmlSlangVisitor'
-import { Context, ErrorSeverity, ErrorType, SourceError } from '../types'
+import { Context, ErrorSeverity, ErrorType, SmlType, SourceError } from '../types'
 import { stripIndent } from '../utils/formatters'
 
 export class DisallowedConstructError implements SourceError {
@@ -156,17 +153,35 @@ function contextToLocation(ctx: ExpressionContext): es.SourceLocation {
   }
 }
 
-function help(expressions: es.Expression[], str: string) : es.Expression[] {
-  const arr : es.Expression[] = [] 
-  for (let i = 0; i < expressions.length; i++) {
-    const curr : es.Expression = expressions[i] 
-    if (curr.leadingComments && curr.leadingComments![0].value === str) {
-      arr.push(...(curr as any).elements) 
-    } else {
-      arr.push(curr)
-    }
+function smlToJsBinop(token: Token): es.BinaryOperator {
+  switch (token.text) {
+    case '*':
+      return '*'
+    case 'div':
+      return '/'
+    case 'mod':
+      return '%'
+    case '+':
+      return '+'
+    case '-':
+      return '-'
+    case '^':
+      return '^'
+    case '=':
+      return '==='
+    case '<>':
+      return '!=='
+    case '>=':
+      return '>='
+    case '>':
+      return '>'
+    case '<=':
+      return '<='
+    case '<':
+      return '<'
+    default:
+      throw Error('undefined sml binop token ' + token.text)
   }
-  return arr
 }
 
 class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
@@ -226,10 +241,12 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
       loc: contextToLocation(ctx)
     }
   }
+
   visitParentheses(ctx: ParenthesesContext): es.Expression {
     return this.visit(ctx.expression())
   }
-  visitPower(ctx: PowerContext): es.Expression {
+
+  visitConcat(ctx: ConcatContext): es.Expression {
     return {
       type: 'BinaryExpression',
       operator: '^',
@@ -239,126 +256,51 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     }
   }
 
-  visitMultiplication(ctx: MultiplicationContext): es.Expression {
+  visitFactor(ctx: FactorContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '*',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-  visitDivision(ctx: DivisionContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '/',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-  visitAddition(ctx: AdditionContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '+',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
     }
   }
 
-  visitSubtraction(ctx: SubtractionContext): es.Expression {
+  visitAddSub(ctx: AddSubContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '-',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
     }
   }
 
-  visitModulo(ctx: ModuloContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '%',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitAppend(ctx: AppendContext): es.Expression {
-    // const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
+  visitListOps(ctx: ListOpsContext): es.Expression {
+    const expressions: es.Expression[] = [this.visit(ctx._left), this.visit(ctx._right)]
+    const tag = ctx._operator.text === '::' ? 'list_construct' : 'list_append'
     return {
       type: 'ArrayExpression',
-      elements: help(ctx.expression().map(exp => exp.accept(this)), 'list_append'),
-      leadingComments: [{type: "Line", value: 'list_append'}]
+      elements: expressions,
+      leadingComments: [{ type: 'Line', value: tag }],
+      loc: contextToLocation(ctx)
     }
   }
 
-  visitMerge(ctx: MergeContext): es.Expression {
-    // const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
-    return {
-      type: 'ArrayExpression',
-      elements: help(ctx.expression().map(exp => exp.accept(this)), 'list_merge'),
-      leadingComments: [{type: "Line", value: 'list_merge'}]
-    }
-  }
-
-  visitGreaterThan(ctx: GreaterThanContext): es.Expression {
+  visitEquality(ctx: EqualityContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '>',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
     }
   }
 
-  visitGreaterThanOrEqual(ctx: GreaterThanOrEqualContext): es.Expression {
+  visitInequality(ctx: InequalityContext): es.Expression {
     return {
       type: 'BinaryExpression',
-      operator: '>=',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitLessThan(ctx: LessThanContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '<',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitLessThanOrEqual(ctx: LessThanOrEqualContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '<=',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitEqual(ctx: EqualContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '===',
-      left: this.visit(ctx._left),
-      right: this.visit(ctx._right),
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitNequal(ctx: NequalContext): es.Expression {
-    return {
-      type: 'BinaryExpression',
-      operator: '!==',
+      operator: smlToJsBinop(ctx._operator),
       left: this.visit(ctx._left),
       right: this.visit(ctx._right),
       loc: contextToLocation(ctx)
@@ -380,7 +322,8 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{ type: 'Line', value: 'list_lit' }]
+      leadingComments: [{ type: 'Line', value: 'list_lit' }],
+      loc: contextToLocation(ctx)
     }
   }
 
@@ -389,7 +332,8 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{ type: 'Line', value: 'tuple_lit' }]
+      leadingComments: [{ type: 'Line', value: 'tuple_lit' }],
+      loc: contextToLocation(ctx)
     }
   }
 
@@ -419,25 +363,26 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     return expressions
   }
 
-  visitFuncApp(ctx: FuncAppContext) : es.Expression {
-    const callee : es.Expression = this.visit(ctx._callee); 
-    if (!['Identifier', 'FunctionExpression'].includes(callee.type)) {
+  visitFuncApp(ctx: FuncAppContext): es.Expression {
+    const callee: es.Expression = this.visit(ctx._callee)
+    if (!['Identifier', 'FunctionExpression', 'CallExpression'].includes(callee.type)) {
       throw Error(`Cannot apply to a ${callee.type}`)
     }
-    const exprs = ctx.expression() 
+    const exprs = ctx.expression()
     const args = []
-    for (let i = 1; i < exprs.length; i++) { // skip the first expr as its the callee 
+    for (let i = 1; i < exprs.length; i++) {
+      // skip the first expr as its the callee
       args.push(exprs[i].accept(this))
     }
     return {
-      type: 'CallExpression', 
+      type: 'CallExpression',
       callee,
       arguments: args,
-      optional: false // not sure what this does yet 
+      optional: false // not sure what this does yet
     }
   }
 
-  visitFuncExpr(ctx: FuncExprContext) : es.Expression {
+  visitFuncExpr(ctx: FuncExprContext): es.Expression {
     return {
       type: 'FunctionExpression',
       id: null,
@@ -502,29 +447,46 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
 class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
     const init = new ExpressionGenerator().visit(ctx._value) // variable value
-    const id : es.Identifier = {
-      type: 'Identifier',
-      name: ctx._identifier.text! // '!' is a non-null assertion operator
-    }
+    const pat: es.Pattern[] = new PatternGenerator().visit(ctx._identifier)
 
-    if (ctx.REC() && init.type === 'FunctionExpression') { // 'rec' can only be specified for lambdas 
-      // set id on lambda so that var name can be bound within the func block
-      // var dec will basically behave like a 'fun' dec 
-      init.id = id 
+    if (pat.length > 1) {
+      // pattern matching
+      throw Error('not supported yet')
     }
-    return [
-      {
-        type: 'VariableDeclarator',
-        id,
-        init
-      }
-    ]
+    const id = pat[0]
+
+    if (ctx.REC() && init.type === 'FunctionExpression' && id.type === 'Identifier') {
+      // 'rec' can only be specified for lambdas
+      // set id on lambda so that var name can be bound within the func block
+      // var dec will basically behave like a 'fun' dec
+      init.id = id
+    }
+    const declarator: es.VariableDeclarator = {
+      type: 'VariableDeclarator',
+      id,
+      init
+    }
+    return [declarator]
   }
   visitFunDec(ctx: FunDecContext): es.VariableDeclarator[] {
+    const params: es.Pattern[] = new PatternGenerator().visit(ctx._params)
+    const retType: SmlType = ctx._retType ? ctx._retType.accept(new TypeGenerator()) : "'a"
+
+    // get type of function
+    let paramsType: SmlType | SmlType[] = []
+    for (let i = 0; i < params.length; i++) {
+      const curr: es.Pattern = params[i]
+      paramsType.push(curr['valType'] ? curr['valType'] : "'a")
+    }
+    if (paramsType.length === 1) {
+      paramsType = paramsType[0]
+    }
+
     const identifier = {
       type: 'Identifier',
       name: ctx._identifier.text!
     } as es.Identifier
+    identifier['valType'] = [paramsType, retType, 'fun']
 
     return [
       {
@@ -533,7 +495,7 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
         init: {
           type: 'FunctionExpression',
           id: identifier,
-          params: new PatternGenerator().visit(ctx.pattern()),
+          params,
           body: {
             type: 'BlockStatement',
             body: [
@@ -547,23 +509,25 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
       }
     ]
   }
-  visitLocalDecs(ctx: LocalDecsContext) : es.VariableDeclarator[] {
-    const localDecs : es.VariableDeclarator[] = this.visitSeqDec(ctx._localDecs)
-    const decs : es.VariableDeclarator[] = this.visitSeqDec(ctx._decs)
+  visitLocalDecs(ctx: LocalDecsContext): es.VariableDeclarator[] {
+    const localDecs: es.VariableDeclarator[] = this.visitSeqDec(ctx._localDecs)
+    const decs: es.VariableDeclarator[] = this.visitSeqDec(ctx._decs)
     if (decs.length > 0) {
       // to handle nested local (i.e. if decs has its own 'locals' field)
-      const prevDecs : es.VariableDeclarator[] = decs[0]['locals'] ? decs[0]['locals'].decs.declarations : []
-      
+      const prevDecs: es.VariableDeclarator[] = decs[0]['locals']
+        ? decs[0]['locals'].decs.declarations
+        : []
+
       decs[0]['locals'] = {
         decs: {
           type: 'VariableDeclaration',
           declarations: localDecs.concat(prevDecs),
           kind: 'const'
         },
-        arity: decs.length 
+        arity: decs.length
       }
     }
-    return decs 
+    return decs
   }
   visitSeqDec(ctx: SeqDeclContext): es.VariableDeclarator[] {
     const ctxs = ctx.declaration()
@@ -595,6 +559,73 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   }
 
   visitErrorNode(node: ErrorNode): es.VariableDeclarator[] {
+    throw new FatalSyntaxError(
+      {
+        start: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine
+        },
+        end: {
+          line: node.symbol.line,
+          column: node.symbol.charPositionInLine + 1
+        }
+      },
+      `invalid syntax ${node.text}`
+    )
+  }
+}
+
+class TypeGenerator implements SmlSlangVisitor<SmlType> {
+  visitLitType(ctx: LitTypeContext): SmlType {
+    const type = ctx.TYPE()._symbol.text
+    if (type === 'bool') {
+      return 'boolean'
+    }
+    return type as SmlType
+  }
+  visitListType(ctx: ListTypeContext): SmlType {
+    // i.e. int list, int list list, (int * bool) list,
+    const type = ctx.TYPE()._symbol.text
+    if (type !== 'list') {
+      throw Error(`expecting type 'list' but got type ${type}`)
+    }
+    const listType = ctx._listType.accept(this)
+    if (Array.isArray(listType) && listType[listType.length - 1] === 'list') {
+      listType.push(type) 
+      return listType
+    } else {
+      return [listType, type]
+    }
+  }
+  visitTypeParens(ctx: TypeParensContext): SmlType {
+    return ctx._inner.accept(this)
+  }
+  visitFuncType(ctx: FuncTypeContext): SmlType {
+    // i.e. int -> int, (int * int) -> bool
+    const paramType = ctx._left.accept(this)
+    const returnType = ctx._right.accept(this)
+    return [paramType, returnType, 'fun']
+  }
+  visitTupleType(ctx: TupleTypeContext): SmlType {
+    // i.e. int * bool * int
+    const types = ctx.type().map(type => type.accept(this))
+    types.push('tuple')
+    return types
+  }
+
+  visit(tree: ParseTree): SmlType {
+    return tree.accept(this)
+  }
+
+  visitChildren(node: RuleNode): SmlType {
+    return node.accept(this)
+  }
+
+  visitTerminal(node: TerminalNode): SmlType {
+    return node.accept(this)
+  }
+
+  visitErrorNode(node: ErrorNode): SmlType {
     throw new FatalSyntaxError(
       {
         start: {
@@ -661,37 +692,50 @@ class StmtGenerator implements SmlSlangVisitor<es.Statement> {
 
 class PatternGenerator implements SmlSlangVisitor<es.Pattern[]> {
   visitPattId(ctx: PattIdContext): es.Pattern[] {
-    return [{
+    const nameToken = ctx.ID() ? ctx.ID() : ctx.TYPE()
+    const id: es.Pattern = {
       type: 'Identifier',
-      name: ctx.ID()?.text!
-    }]
+      name: nameToken?.text!
+    }
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
+    return [id]
   }
 
   visitPattWildc(ctx: PattWildcContext): es.Pattern[] {
-    return [{
+    const id: es.Pattern = {
       type: 'Identifier',
       name: '_'
-    }]
+    }
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
+    return [id]
   }
 
-  visitPattTuple(ctx: PattTupleContext) : es.Pattern[] {
-    const patterns = ctx.pattern() 
+  visitPattTuple(ctx: PattTupleContext): es.Pattern[] {
+    const patterns = ctx.pattern()
     const elements = patterns.reduce((x, y) => x.concat(y.accept(this)), [] as es.Pattern[])
     return elements
   }
 
-  visitPattNum(ctx: PattNumContext) : es.Pattern[] {
-    return [{
+  visitPattNum(ctx: PattNumContext): es.Pattern[] {
+    const id: es.Pattern = {
       type: 'Identifier',
       name: '_'
-    }]
+    }
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
+    return [id]
   }
 
-  visitPattBool(ctx: PattBoolContext) : es.Pattern[] {
-    return [{
+  visitPattBool(ctx: PattBoolContext): es.Pattern[] {
+    const id: es.Pattern = {
       type: 'Identifier',
       name: '_'
-    }]
+    }
+
+    id['valType'] = ctx.type() ? ctx.type()?.accept(new TypeGenerator()) : undefined
+    return [id]
   }
 
   visit(tree: ParseTree): es.Pattern[] {
