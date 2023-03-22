@@ -588,7 +588,7 @@ const microcode: { [tag: string]: Function } = {
     const val = S.peek() 
     const valType = val.type
     const idType = cmd.id.type 
-    if (idType && !rttc.typeArrEqual(valType, idType)) {
+    if (idType && !rttc.isTypeArrSubset(valType, idType)) {
       // used dummy node for now, lazy pass node
       const dummyNode: es.Node = { type: 'Literal', value: null }
       throw new rttc.TypeError(
@@ -666,7 +666,7 @@ const microcode: { [tag: string]: Function } = {
     if (args.length > 1) {
       argsTypes.push('tuple')
     }
-    if (!rttc.typeArrEqual(argsTypes, paramsTypes as SmlType)) {
+    if (!rttc.isTypeArrSubset(argsTypes, paramsTypes as SmlType)) {
       const dummyNode: es.Node = { type: 'Literal', value: null }
       throw new rttc.TypeError(dummyNode, ' as argument to function', rttc.typeToString(paramsTypes), rttc.typeToString(argsTypes))
     }
@@ -702,7 +702,12 @@ const microcode: { [tag: string]: Function } = {
   branch_check_i: (cmd: { cons: any; alt: any; node: es.ConditionalExpression }) => {
     const consVal = S.pop()
     const altVal = S.pop()
-    if (!rttc.typeArrEqual(consVal.type, altVal.type)) {
+
+    const subsetOfConsAlt = rttc.isTypeArrSubset(consVal.type, altVal.type)
+    const subsetOfAltCons = rttc.isTypeArrSubset(altVal.type, consVal.type)
+
+    // check if neither types of cons and alt are subsets of the other
+    if (!subsetOfConsAlt || !subsetOfAltCons) {
       throw Error(`Match rules disagree on type: Cannot merge '${consVal.type}' and '${altVal.type}'`)
     }
 
@@ -711,8 +716,11 @@ const microcode: { [tag: string]: Function } = {
       throw new rttc.TypeError(cmd.node, " as predicate", 'boolean', pred.type)
     }
      
-    // push type of conditional expr onto stack (doesnt matter whether we choose cons or alt type)
-    S.push({ type: consVal.type, value: null })
+    // push type of conditional expr onto stack (take the most constraining type)
+    S.push({ 
+      type: subsetOfConsAlt ? subsetOfConsAlt : subsetOfAltCons,
+      value: null 
+    })
   },
   closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
     // for now, parameter types are all given

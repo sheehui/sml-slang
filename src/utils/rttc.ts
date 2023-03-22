@@ -45,10 +45,10 @@ const isTypedString = (v: TypedValue) => v.type === 'string'
 const isTypedBool = (v: TypedValue) => v.type === 'boolean'
 const isFreeLiteral = (v: TypedValue) => v.type === "'a"
 const isTypedList = (v: TypedValue) =>
-  Array.isArray(v.type) && v.type[v.type.length - 1] === 'list' && Array.isArray(v.value)
+  Array.isArray(v.type) && v.type[v.type.length - 1] === 'list' 
 const isFreeList = (v: TypedValue) => isTypedList(v) && v.type[0] === "'a"
 const isTypedTuple = (v: TypedValue) =>
-  Array.isArray(v.type) && v.type[v.type.length - 1] === 'tuple' && Array.isArray(v.value)
+  Array.isArray(v.type) && v.type[v.type.length - 1] === 'tuple' 
 const isListOrTuple = (v: TypedValue) => isTypedList(v) || isTypedTuple(v)
 
 const getListDepth = (v: TypedValue) => {
@@ -102,6 +102,13 @@ export const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
   return false
 }
 
+export const isTypeArrSubset = (superset: SmlType, subset: SmlType): undefined | SmlType => {
+  // if is subset, return subset type, else return undefined 
+  // wrap types in dummy TypedValues (we do not use the value attribute)
+  const isSubset = isTypeSubset({ type: superset, value: 0 }, { type: subset, value: 0 })
+  return isSubset ? subset : undefined 
+}
+
 const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
   if (isTypedList(superset) && isTypedList(subset)) {
     return isFreeList(superset)
@@ -121,7 +128,7 @@ const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
     return true
   }
 
-  return isTypeEqual(superset, subset)
+  return typeArrEqual(superset.type, subset.type)
 }
 
 const getTypeString = (val: TypedValue | string): string => {

@@ -827,4 +827,16 @@ describe('type annotations', () => {
       )
     })
   })
+
+  test('type subsets', () => {
+    const code: string = `
+      val x : int list = []; 
+      val y : int list list = [[]]; 
+      val z : int list = if true then [] else [1,2];
+      val a : int list = z; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([])
+    })
+  })
 })
