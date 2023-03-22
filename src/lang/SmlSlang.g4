@@ -36,8 +36,6 @@ FUN: 'fun';
 FN: 'fn'; 
 LAMARR: '=>'; 
 TYPARR: '->'; 
-WHILE: 'while';
-DO: 'do';
 SEMIC: ';'; 
 WILDC: '_'; 
 NIL: 'nil'; 
@@ -62,36 +60,36 @@ stmt
    ; 
 
 expression
-   : (ID | TYPE)                                                              # Identifier
-   | STRING                                                          # String
-   | NUMBER                                                          # Number
-   | BOOLEAN                                                         # Boolean
-   | NIL                                                             # Nil
+   : (ID | TYPE)                                                                  # Identifier
+   | STRING                                                                       # String
+   | NUMBER                                                                       # Number
+   | BOOLEAN                                                                      # Boolean
+   | NIL                                                                          # Nil
 
-   | FN params=pattern LAMARR (expression)                           # FuncExpr
-   | callee=expression '(' ( expression ( ',' expression )* )? ')'   # FuncApp
+   | FN params=pattern LAMARR (expression)                                        # FuncExpr
+   | callee=expression '(' ( expression ( ',' expression )* )? ')'                # FuncApp
 
-   | '(' inner=expression ')'                                        # Parentheses
-   | '(' ( expression ( ',' expression )* )? ')'                     # Tuple
-
-   | '[' ( expression ( ',' expression )* )? ']'                     # List
-   | <assoc=right> expression DCOLON expression                      # Construct
-   | left=expression AMPERSAND right=expression                      # Append
-
-   | operator=NEG right=expression                                   # Negation
-   | left=expression operator=(MUL | DIV | MOD) right=expression     # Factor
-   | left=expression operator=(ADD | SUB) right=expression           # AddSub
+   | '(' inner=expression ')'                                                     # Parentheses
    
-   | left=expression operator=CONCAT right=expression                # Concat
+   | '(' ( expression ( ',' expression )* )? ')'                                  # Tuple
+   | '[' ( expression ( ',' expression )* )? ']'                                  # List
 
-   | operator=NOT right=expression                                   # Not
-   | left=expression operator=(GT | GTE | LT | LTE) right=expression # Inequality
-   | left=expression operator=(EQUAL | NEQUAL) right=expression      # Equality
+   | operator=NEG right=expression                                                # Negation
+   | left=expression operator=(MUL | DIV | MOD) right=expression                  # Factor
+   | left=expression operator=(ADD | SUB) right=expression                        # AddSub
+   
+   | left=expression operator=CONCAT right=expression                             # Concat
 
-   | IF pred=expression THEN cons=expression ELSE alt=expression     # Conditional
-   | LET decl=seqDecl IN expr=seqExpr END                            # LocalDec
+   | operator=NOT right=expression                                                # Not
+   | left=expression operator=(GT | GTE | LT | LTE) right=expression              # Inequality
+   | left=expression operator=(EQUAL | NEQUAL) right=expression                   # Equality
 
-   | record=TUPLE_ACCESS expr=expression                             # TupleAccess
+   | <assoc=right> left=expression operator=(DCOLON | AMPERSAND) right=expression # ListOps
+
+   | IF pred=expression THEN cons=expression ELSE alt=expression                  # Conditional
+   | LET decl=seqDecl IN expr=seqExpr END                                         # LocalDec
+
+   | record=TUPLE_ACCESS expr=expression                                          # TupleAccess
    ;
 
 seqExpr
