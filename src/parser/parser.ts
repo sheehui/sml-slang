@@ -10,11 +10,9 @@ import * as es from 'estree'
 import { SmlSlangLexer } from '../lang/SmlSlangLexer'
 import {
   AddSubContext,
-  AppendContext,
   BooleanContext,
   ConcatContext,
   ConditionalContext,
-  ConstructContext,
   DeclarationContext,
   EqualityContext,
   ExpressionContext,
@@ -26,6 +24,7 @@ import {
   IdentifierContext,
   InequalityContext,
   ListContext,
+  ListOpsContext,
   ListTypeContext,
   LitTypeContext,
   LocalDecContext,
@@ -277,22 +276,13 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
     }
   }
 
-  visitConstruct(ctx: ConstructContext): es.Expression {
-    const expressions: es.Expression[] = ctx.expression().map(exp => exp.accept(this))
-    return {
-      type: 'ArrayExpression',
-      elements: expressions,
-      leadingComments: [{ type: 'Line', value: 'list_construct' }],
-      loc: contextToLocation(ctx)
-    }
-  }
-
-  visitAppend(ctx: AppendContext): es.Expression {
+  visitListOps(ctx: ListOpsContext): es.Expression {
     const expressions: es.Expression[] = [this.visit(ctx._left), this.visit(ctx._right)]
+    const tag = ctx._operator.text === '::' ? 'list_construct' : 'list_append'
     return {
       type: 'ArrayExpression',
       elements: expressions,
-      leadingComments: [{ type: 'Line', value: 'list_append' }],
+      leadingComments: [{ type: 'Line', value: tag }],
       loc: contextToLocation(ctx)
     }
   }

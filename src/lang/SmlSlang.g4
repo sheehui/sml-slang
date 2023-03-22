@@ -62,36 +62,35 @@ stmt
    ; 
 
 expression
-   : (ID | TYPE)                                                              # Identifier
-   | STRING                                                          # String
-   | NUMBER                                                          # Number
-   | BOOLEAN                                                         # Boolean
-   | NIL                                                             # Nil
+   : (ID | TYPE)                                                                  # Identifier
+   | STRING                                                                       # String
+   | NUMBER                                                                       # Number
+   | BOOLEAN                                                                      # Boolean
+   | NIL                                                                          # Nil
 
-   | FN params=pattern LAMARR (expression)                           # FuncExpr
-   | callee=expression '(' ( expression ( ',' expression )* )? ')'   # FuncApp
+   | FN params=pattern LAMARR (expression)                                        # FuncExpr
+   | callee=expression '(' ( expression ( ',' expression )* )? ')'                # FuncApp
 
-   | '(' inner=expression ')'                                        # Parentheses
-   | '(' ( expression ( ',' expression )* )? ')'                     # Tuple
+   | '(' inner=expression ')'                                                     # Parentheses
+   | '(' ( expression ( ',' expression )* )? ')'                                  # Tuple
 
-   | '[' ( expression ( ',' expression )* )? ']'                     # List
-   | <assoc=right> expression DCOLON expression                      # Construct
-   | left=expression AMPERSAND right=expression                      # Append
+   | '[' ( expression ( ',' expression )* )? ']'                                  # List
+   | <assoc=right> left=expression operator=(DCOLON | AMPERSAND) right=expression # ListOps
 
-   | operator=NEG right=expression                                   # Negation
-   | left=expression operator=(MUL | DIV | MOD) right=expression     # Factor
-   | left=expression operator=(ADD | SUB) right=expression           # AddSub
+   | operator=NEG right=expression                                                # Negation
+   | left=expression operator=(MUL | DIV | MOD) right=expression                  # Factor
+   | left=expression operator=(ADD | SUB) right=expression                        # AddSub
    
-   | left=expression operator=CONCAT right=expression                # Concat
+   | left=expression operator=CONCAT right=expression                             # Concat
 
-   | operator=NOT right=expression                                   # Not
-   | left=expression operator=(GT | GTE | LT | LTE) right=expression # Inequality
-   | left=expression operator=(EQUAL | NEQUAL) right=expression      # Equality
+   | operator=NOT right=expression                                                # Not
+   | left=expression operator=(GT | GTE | LT | LTE) right=expression              # Inequality
+   | left=expression operator=(EQUAL | NEQUAL) right=expression                   # Equality
 
-   | IF pred=expression THEN cons=expression ELSE alt=expression     # Conditional
-   | LET decl=seqDecl IN expr=seqExpr END                            # LocalDec
+   | IF pred=expression THEN cons=expression ELSE alt=expression                  # Conditional
+   | LET decl=seqDecl IN expr=seqExpr END                                         # LocalDec
 
-   | record=TUPLE_ACCESS expr=expression                             # TupleAccess
+   | record=TUPLE_ACCESS expr=expression                                          # TupleAccess
    ;
 
 seqExpr
@@ -110,7 +109,7 @@ declaration
 
 type 
    : TYPE                                                         # LitType
-   | listType=type TYPE                                         # ListType 
+   | listType=type TYPE                                           # ListType 
    | '(' inner=type ')'                                           # TypeParens
    | left=type MUL right=type                                     # TupleType
    | left=type TYPARR right=type                                  # FuncType
