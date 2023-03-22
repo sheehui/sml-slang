@@ -52,7 +52,7 @@ import {
   VarDecContext
 } from '../lang/SmlSlangParser'
 import { SmlSlangVisitor } from '../lang/SmlSlangVisitor'
-import { Context, ErrorSeverity, ErrorType, SmlType, SourceError, TypedValue } from '../types'
+import { Context, ErrorSeverity, ErrorType, SmlType, SourceError } from '../types'
 import { stripIndent } from '../utils/formatters'
 
 export class DisallowedConstructError implements SourceError {

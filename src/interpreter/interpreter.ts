@@ -8,7 +8,7 @@ import { Stack } from '../types'
 import { binaryOp, unaryOp } from '../utils/operators'
 import * as rttc from '../utils/rttc'
 
-const step_limit = 1000000
+const step_limit = 10000
 let A = new Stack<any>()
 let S = new Stack<Value>()
 let E = createGlobalEnvironment()
@@ -531,14 +531,21 @@ const microcode: { [tag: string]: Function } = {
     node: es.ConditionalExpression
     isCheck: boolean
   }) => {
-    A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
-    // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
-    // cmd.cons['isCheck'] = cmd.isCheck
-    // cmd.alt['isCheck'] = cmd.isCheck
-    // A.push(cmd.cons)
-    // A.push(cmd.alt)
-    cmd.pred['isCheck'] = cmd.isCheck
-    A.push(cmd.pred)
+    if (!cmd.isCheck) {
+      // actually evaluate the cons and alt in 'branch_i' 
+      A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
+      cmd.pred['isCheck'] = cmd.isCheck 
+      A.push(cmd.pred)
+    }
+
+    // type check, 'branch_check_i' does not eval cons and alt
+    A.push({ tag: 'branch_check_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node })
+    A.push({...cmd.cons, isCheck: true })
+    A.push({...cmd.alt, isCheck: true })
+    
+    A.push({...cmd.pred, isCheck: true})
+    
+    
   },
   binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
     const right = S.pop()
@@ -680,6 +687,7 @@ const microcode: { [tag: string]: Function } = {
     for (let j = 0; j < cmd.arity; j++) {
       newFrame[func.params[j]] = args[j]
     }
+    console.log(newFrame, "NEWFRAME")
     E = {
       head: newFrame,
       tail: func.env,
@@ -688,33 +696,23 @@ const microcode: { [tag: string]: Function } = {
     }
   },
   branch_i: (cmd: { cons: any; alt: any; node: es.ConditionalExpression; isCheck: boolean }) => {
-    if (cmd.isCheck) {
-      const checkCons = { ...cmd.cons, isCheck: cmd.isCheck }
-      const checkAlt = { ...cmd.alt, isCheck: cmd.isCheck }
-      A.push(checkCons)
-      A.push(checkAlt)
-      return
+    const pred = S.pop() 
+    A.push(pred.value ? cmd.cons : cmd.alt)
+  },
+  branch_check_i: (cmd: { cons: any; alt: any; node: es.ConditionalExpression }) => {
+    const consVal = S.pop()
+    const altVal = S.pop()
+    if (!rttc.typeArrEqual(consVal.type, altVal.type)) {
+      throw Error(`Match rules disagree on type: Cannot merge '${consVal.type}' and '${altVal.type}'`)
     }
-
-    // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
-    // const consVal = S.pop()
-    // const altVal = S.pop()
-    // if (rttc.isTypeEqual(consVal.type, altVal.type)) {
-    //   throw Error(`Match rules disagree on type: Cannot merge '${consVal.type}' and '${altVal.type}'`)
-    // }
 
     const pred = S.pop()
-    const error = rttc.checkIfStatement(cmd.node, pred)
-    if (error) {
-      throw error
+    if (!rttc.typeArrEqual(pred.type, 'boolean')) {
+      throw new rttc.TypeError(cmd.node, " as predicate", 'boolean', pred.type)
     }
-
-    // FOR CHECKING BRANCH TYPES LATER (doesnt work if there are func apps yet)
-    // A.push({
-    //   tag: 'lit',
-    //   val: pred.value ? consVal.value : altVal.value
-    // })
-    A.push(pred.value ? cmd.cons : cmd.alt)
+     
+    // push type of conditional expr onto stack (doesnt matter whether we choose cons or alt type)
+    S.push({ type: consVal.type, value: null })
   },
   closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
     // for now, parameter types are all given
@@ -762,11 +760,11 @@ export function* evaluate(node: es.Node, context: Context): any {
     // console.log("\n=====agenda====")
     // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
-      console.log('before stash:')
-      S.print() // print stash
+      // console.log('before stash:')
+      // S.print() // print stash
       microcode[cmd.tag](cmd)
-      console.log('after stash:')
-      S.print() // print stash
+      // console.log('after stash:')
+      // S.print() // print stash
     } else {
       console.log('error')
     }

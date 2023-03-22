@@ -654,18 +654,6 @@ describe('type annotations', () => {
     })
   })
 
-  test('value assigned is computed', () => {
-    const code: string = `
-      val a : int = 4; 
-      val b = true; 
-      val c : string = "hello"; 
-      val result : string = if (b) then c else a; 
-    `
-    return runInContext(code, context, options).then(data => {
-      expect((data as Finished).value).toStrictEqual('hello')
-    })
-  })
-
   test('fun dec return type does not match', () => {
     const code: string = `
       fun test (x : int) : int = x > 6; 
@@ -810,6 +798,32 @@ describe('type annotations', () => {
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
         'Expected (int list * boolean list) list as assigned value, got (int list list * boolean list) list.'
+      )
+    })
+  })
+
+  test('mismatch conditional branch types', () => {
+    const code: string = `
+      val a : int = 4; 
+      val b = true; 
+      val c : string = "hello"; 
+      val result : string = if (b) then c else a; 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.message).toMatch("Match rules disagree on type: Cannot merge 'string' and 'int'")
+    })
+  })
+
+  test('mismatch conditional pred type', () => {
+    const code: string = `
+      fun test (x : int) : int = 
+        if (x) 
+        then 1 
+        else 2; 
+    `
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch(
+        'Expected boolean as predicate, got int.'
       )
     })
   })
