@@ -70,10 +70,9 @@ expression
    | callee=expression '(' ( expression ( ',' expression )* )? ')'                # FuncApp
 
    | '(' inner=expression ')'                                                     # Parentheses
+   
    | '(' ( expression ( ',' expression )* )? ')'                                  # Tuple
-
    | '[' ( expression ( ',' expression )* )? ']'                                  # List
-   | <assoc=right> left=expression operator=(DCOLON | AMPERSAND) right=expression # ListOps
 
    | operator=NEG right=expression                                                # Negation
    | left=expression operator=(MUL | DIV | MOD) right=expression                  # Factor
@@ -84,6 +83,8 @@ expression
    | operator=NOT right=expression                                                # Not
    | left=expression operator=(GT | GTE | LT | LTE) right=expression              # Inequality
    | left=expression operator=(EQUAL | NEQUAL) right=expression                   # Equality
+
+   | <assoc=right> left=expression operator=(DCOLON | AMPERSAND) right=expression # ListOps
 
    | IF pred=expression THEN cons=expression ELSE alt=expression                  # Conditional
    | LET decl=seqDecl IN expr=seqExpr END                                         # LocalDec
