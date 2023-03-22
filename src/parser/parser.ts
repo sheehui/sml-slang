@@ -52,7 +52,7 @@ import {
   VarDecContext
 } from '../lang/SmlSlangParser'
 import { SmlSlangVisitor } from '../lang/SmlSlangVisitor'
-import { Context, ErrorSeverity, ErrorType, SmlType, SourceError, TypedValue } from '../types'
+import { Context, ErrorSeverity, ErrorType, SmlType, SourceError } from '../types'
 import { stripIndent } from '../utils/formatters'
 
 export class DisallowedConstructError implements SourceError {
@@ -365,7 +365,7 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
 
   visitFuncApp(ctx: FuncAppContext): es.Expression {
     const callee: es.Expression = this.visit(ctx._callee)
-    if (!['Identifier', 'FunctionExpression'].includes(callee.type)) {
+    if (!['Identifier', 'FunctionExpression', 'CallExpression'].includes(callee.type)) {
       throw Error(`Cannot apply to a ${callee.type}`)
     }
     const exprs = ctx.expression()
@@ -469,10 +469,24 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
     return [declarator]
   }
   visitFunDec(ctx: FunDecContext): es.VariableDeclarator[] {
+    const params: es.Pattern[] = new PatternGenerator().visit(ctx._params)
+    const retType: SmlType = ctx._retType ? ctx._retType.accept(new TypeGenerator()) : "'a"
+
+    // get type of function
+    let paramsType: SmlType | SmlType[] = []
+    for (let i = 0; i < params.length; i++) {
+      const curr: es.Pattern = params[i]
+      paramsType.push(curr['valType'] ? curr['valType'] : "'a")
+    }
+    if (paramsType.length === 1) {
+      paramsType = paramsType[0]
+    }
+
     const identifier = {
       type: 'Identifier',
       name: ctx._identifier.text!
     } as es.Identifier
+    identifier['valType'] = [paramsType, retType, 'fun']
 
     return [
       {
@@ -481,7 +495,7 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
         init: {
           type: 'FunctionExpression',
           id: identifier,
-          params: new PatternGenerator().visit(ctx.pattern()),
+          params,
           body: {
             type: 'BlockStatement',
             body: [
@@ -575,18 +589,28 @@ class TypeGenerator implements SmlSlangVisitor<SmlType> {
     if (type !== 'list') {
       throw Error(`expecting type 'list' but got type ${type}`)
     }
-    throw Error('not supported yet')
+    const listType = ctx._listType.accept(this)
+    if (Array.isArray(listType) && listType[listType.length - 1] === 'list') {
+      listType.push(type) 
+      return listType
+    } else {
+      return [listType, type]
+    }
   }
   visitTypeParens(ctx: TypeParensContext): SmlType {
     return ctx._inner.accept(this)
   }
   visitFuncType(ctx: FuncTypeContext): SmlType {
     // i.e. int -> int, (int * int) -> bool
-    throw Error('not supported yet')
+    const paramType = ctx._left.accept(this)
+    const returnType = ctx._right.accept(this)
+    return [paramType, returnType, 'fun']
   }
   visitTupleType(ctx: TupleTypeContext): SmlType {
     // i.e. int * bool * int
-    throw Error('not supported yet')
+    const types = ctx.type().map(type => type.accept(this))
+    types.push('tuple')
+    return types
   }
 
   visit(tree: ParseTree): SmlType {

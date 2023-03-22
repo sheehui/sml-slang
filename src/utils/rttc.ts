@@ -45,10 +45,10 @@ const isTypedString = (v: TypedValue) => v.type === 'string'
 const isTypedBool = (v: TypedValue) => v.type === 'boolean'
 const isFreeLiteral = (v: TypedValue) => v.type === "'a"
 const isTypedList = (v: TypedValue) =>
-  Array.isArray(v.type) && v.type[v.type.length - 1] === 'list' && Array.isArray(v.value)
+  Array.isArray(v.type) && v.type[v.type.length - 1] === 'list' 
 const isFreeList = (v: TypedValue) => isTypedList(v) && v.type[0] === "'a"
 const isTypedTuple = (v: TypedValue) =>
-  Array.isArray(v.type) && v.type[v.type.length - 1] === 'tuple' && Array.isArray(v.value)
+  Array.isArray(v.type) && v.type[v.type.length - 1] === 'tuple' 
 const isListOrTuple = (v: TypedValue) => isTypedList(v) || isTypedTuple(v)
 
 const getListDepth = (v: TypedValue) => {
@@ -85,6 +85,30 @@ export const isTypeEqual = (left: TypedValue, right: TypedValue): boolean => {
   }
 }
 
+export const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
+  if (typeof left === 'string' && typeof right === 'string') {
+    return left === right
+  } else if (typeof left !== 'string' && typeof right !== 'string') {
+    if (left.length !== right.length) {
+      return false
+    }
+    for (let i = 0; i < left.length; i++) {
+      if (!typeArrEqual(left[i], right[i])) {
+        return false
+      }
+    }
+    return true
+  }
+  return false
+}
+
+export const isTypeArrSubset = (superset: SmlType, subset: SmlType): undefined | SmlType => {
+  // if is subset, return subset type, else return undefined 
+  // wrap types in dummy TypedValues (we do not use the value attribute)
+  const isSubset = isTypeSubset({ type: superset, value: 0 }, { type: subset, value: 0 })
+  return isSubset ? subset : undefined 
+}
+
 const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
   if (isTypedList(superset) && isTypedList(subset)) {
     return isFreeList(superset)
@@ -104,7 +128,7 @@ const isTypeSubset = (superset: TypedValue, subset: TypedValue): boolean => {
     return true
   }
 
-  return isTypeEqual(superset, subset)
+  return typeArrEqual(superset.type, subset.type)
 }
 
 const getTypeString = (val: TypedValue | string): string => {
@@ -112,7 +136,7 @@ const getTypeString = (val: TypedValue | string): string => {
     return val
   } else if (Array.isArray(val.type)) {
     if (isTypedList(val) || isTypedTuple(val)) {
-      return typeArrToString(val.type)
+      return typeToString(val.type)
     }
     throw Error('Unable to get type of non-list/tuple array for SmlType.type')
   } else {
@@ -120,34 +144,44 @@ const getTypeString = (val: TypedValue | string): string => {
   }
 }
 
-const typeArrToString = (arr: SmlType[]) => {
-  if (arr[arr.length - 1] == 'list') {
+export const typeToString = (type: SmlType) : string => {
+  const isTypeArr = Array.isArray(type) 
+  if (isTypeArr && type[type.length - 1] == 'list') {
     let str = ''
 
-    arr.forEach((element: SmlType | Array<SmlType>) => {
+    type.forEach((element: SmlType | Array<SmlType>) => {
       if (Array.isArray(element)) {
-        str += ' ' + typeArrToString(element)
+        str += ' ' + typeToString(element)
       } else {
         str += ' ' + element
       }
     })
 
     return str.trim()
-  } else if (arr[arr.length - 1] == 'tuple') {
-    let str = ''
+  } else if (isTypeArr && type[type.length - 1] == 'tuple') {
+    let str = '('
 
-    for (let i = 0; i < arr.length - 1; i++) {
-      const element = arr[i]
+    for (let i = 0; i < type.length - 1; i++) {
+      const element = type[i]
+      if (i !== 0) {
+        str += " * "
+      }
       if (Array.isArray(element)) {
-        str += ' * ' + typeArrToString(element)
+        str += typeToString(element)
       } else {
-        str += ' * ' + element
+        str += element
       }
     }
+    str += ')'
 
-    return str.substring(3)
+    return str
+  } else if (isTypeArr && type[type.length - 1] == 'fun') {
+    const paramsType = Array.isArray(type[0]) ? typeToString(type[0]) : type[0]
+    const retType = Array.isArray(type[1]) ? typeToString(type[1]) : type[1]
+
+    return `${paramsType} -> ${retType}`
   } else {
-    return arr[0].toString()
+    return type.toString()
   }
 }
 
@@ -299,7 +333,7 @@ const checkConstructExpression = (node: es.Node, left: any, right: any) => {
   const gotTypeArr: Array<SmlType> = isListOrTuple(left) ? left.type : [left.type]
 
   if (!isTypeArrEqual(gotTypeArr, expectedTypeArr)) {
-    return new TypeError(node, LHS, typeArrToString(expectedTypeArr), typeArrToString(gotTypeArr))
+    return new TypeError(node, LHS, typeToString(expectedTypeArr), typeToString(gotTypeArr))
   }
 
   return
@@ -388,6 +422,34 @@ export const checkBinaryExpression = (
       return checkAppendExpression(node, left, right)
     default:
       return
+  }
+}
+
+export const operatorToResultType = (
+  operator: es.BinaryOperator | es.UnaryOperator | '@' | '::'
+): SmlType => {
+  switch (operator) {
+    case '^':
+      return 'string'
+    case '+':
+    case '-':
+    case '*':
+    case '/':
+    case '%':
+      return 'int'
+    case '<':
+    case '<=':
+    case '>':
+    case '>=':
+    case '!==':
+    case '===':
+      return 'boolean'
+    case '::':
+      return 'list'
+    case '@':
+      return 'list'
+    default:
+      return "'a"
   }
 }
 
