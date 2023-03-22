@@ -36,8 +36,6 @@ FUN: 'fun';
 FN: 'fn'; 
 LAMARR: '=>'; 
 TYPARR: '->'; 
-WHILE: 'while';
-DO: 'do';
 SEMIC: ';'; 
 WILDC: '_'; 
 NIL: 'nil'; 
