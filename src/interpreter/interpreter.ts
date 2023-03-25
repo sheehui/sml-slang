@@ -160,21 +160,23 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
     const params = []
     let paramsTypes = [] 
-    // extend env here 
+    // extend env here to eval func block
     const initEnv = stc.getTypeEnv()
     stc.extendTypeEnv([], []) 
     for (let i = 0; i < node.params.length; i++) {
-      stc.addToFrame((node.params[i] as any).name, "'a")
+      stc.addToFrame((node.params[i] as any).name, "'a") // some unassigned type
+
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
       params.push(param)
       paramsTypes.push(param.type)
+
       stc.addToFrame(param.sym, param.type)
     }
     paramsTypes.push('tuple')
     paramsTypes = paramsTypes.length <= 2 ? paramsTypes[0] : paramsTypes
-    console.log("EVAL BODY")
     const body = yield* evaluators[node.body.type](node.body, context) 
 
+    // finish eval func block so restore the env
     stc.restoreTypeEnv(initEnv)
     return {
       tag: 'lam', 
@@ -191,18 +193,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   Identifier: function* (node: es.Identifier, context: Context) {    
     let valType = (node as any).valType 
-    console.log(stc.getTypeEnv(), "TYPEENV")
     if (!valType) {
       valType = stc.findTypeInEnv(node.name) 
     } else {
       stc.addToFrame(node.name, valType)
     }
-    console.log(valType, node.name)
 
     return {
       tag: 'id', 
       sym: node.name,
-      type: valType // undefined if no type avail 
+      type: valType  
     }
   },
 
@@ -219,7 +219,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
     argTypes.push('tuple')
     argTypes = argTypes.length <= 2 ? argTypes[0] : argTypes
-    // check if arg type = param type 
+    // check if param type can be assigned to arg type 
     if (!rttc.isTypeArrSubset(argTypes, paramTypes)) {
       throw new rttc.TypeError(node, ' as argument to function', rttc.typeToString(paramTypes), rttc.typeToString(argTypes))
     }
@@ -267,7 +267,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
     // push some dummy object containing type onto stack
     const type = rttc.operatorToResultType(node.operator, frst.type, scnd.type)
-    console.log(type, "TYPE")
     return {
       tag: 'binop',
       sym: node.operator,
@@ -748,7 +747,6 @@ const microcode: { [tag: string]: Function } = {
     for (let j = 0; j < cmd.arity; j++) {
       newFrame[func.params[j].sym] = args[j]
     }
-    console.log(newFrame, "NEWFRAME")
     E = {
       head: newFrame,
       tail: func.env,
@@ -801,5 +799,6 @@ export function* evaluate(node: es.Node, context: Context): any {
   console.log('\n=====EXIT EVALUATION=====\n')
   const r = S.pop()
   console.log(r)
+  console.log(stc.getTypeEnv().head)
   return r.value
 }
