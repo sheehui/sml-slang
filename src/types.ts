@@ -22,10 +22,12 @@ export interface CustomBuiltIns {
   visualiseList: (list: any, externalContext: any) => void
 }
 
+
 export enum ErrorType {
   SYNTAX = 'Syntax',
   TYPE = 'Type',
-  RUNTIME = 'Runtime'
+  RUNTIME = 'Runtime',
+  COMPILE_TIME = "Compile Time"
 }
 
 export enum ErrorSeverity {

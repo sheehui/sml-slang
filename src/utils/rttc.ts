@@ -332,9 +332,9 @@ export const checkUnaryExpression = (
   operator: es.UnaryOperator,
   value: TypedValue
 ) => {
-  if (operator === '-' && !isTypedNumber(value)) {
+  if (operator === '~' && !isTypedNumber(value)) {
     return new TypeError(node, '', 'number', value)
-  } else if (operator === '~' && !isTypedBool(value)) {
+  } else if (operator === '!' && !isTypedBool(value)) {
     return new TypeError(node, '', 'boolean', value)
   } else {
     return undefined
@@ -465,6 +465,7 @@ export const operatorToResultType = (
     case '^':
       return 'string'
     case '+':
+    case '~':
     case '-':
     case '*':
     case '/':
@@ -474,6 +475,7 @@ export const operatorToResultType = (
     case '<=':
     case '>':
     case '>=':
+    case '!':
     case '!==':
     case '===':
       return 'boolean'

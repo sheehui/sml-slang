@@ -226,7 +226,7 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   visitNot(ctx: NotContext): es.Expression {
     return {
       type: 'UnaryExpression',
-      operator: '~',
+      operator: '!',
       prefix: true,
       argument: this.visit(ctx._right),
       loc: contextToLocation(ctx)
@@ -235,7 +235,7 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   visitNegation(ctx: NegationContext): es.Expression {
     return {
       type: 'UnaryExpression',
-      operator: '-',
+      operator: '~',
       prefix: true,
       argument: this.visit(ctx._right),
       loc: contextToLocation(ctx)

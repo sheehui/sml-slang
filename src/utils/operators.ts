@@ -136,9 +136,9 @@ export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocat
 }
 
 export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
-  if (operator === '~') {
+  if (operator === '!') {
     return !value.value
-  } else if (operator === '-') {
+  } else if (operator === '~') {
     return -value.value
   } else {
     return +value.value

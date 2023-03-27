@@ -5,9 +5,9 @@ import { createGlobalEnvironment } from '../createContext'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
+import * as cttc from '../utils/cttc'
 import { binaryOp, unaryOp } from '../utils/operators'
 import * as rttc from '../utils/rttc'
-import * as stc from './stc'
 
 const step_limit = 10000
 let A = new Stack<any>()
@@ -161,23 +161,23 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const params = []
     let paramsTypes = [] 
     // extend env here to eval func block
-    const initEnv = stc.getTypeEnv()
-    stc.extendTypeEnv([], []) 
+    const initEnv = cttc.getTypeEnv()
+    cttc.extendTypeEnv([], []) 
     for (let i = 0; i < node.params.length; i++) {
-      stc.addToFrame((node.params[i] as any).name, "'a") // some unassigned type
+      cttc.addToFrame((node.params[i] as any).name, "'a") // some unassigned type
 
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
       params.push(param)
       paramsTypes.push(param.type)
 
-      stc.addToFrame(param.sym, param.type)
+      cttc.addToFrame(param.sym, param.type)
     }
     paramsTypes.push('tuple')
     paramsTypes = paramsTypes.length <= 2 ? paramsTypes[0] : paramsTypes
     const body = yield* evaluators[node.body.type](node.body, context) 
 
     // finish eval func block so restore the env
-    stc.restoreTypeEnv(initEnv)
+    cttc.restoreTypeEnv(initEnv)
     return {
       tag: 'lam', 
       params,
@@ -194,9 +194,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   Identifier: function* (node: es.Identifier, context: Context) {    
     let valType = (node as any).valType 
     if (!valType) {
-      valType = stc.findTypeInEnv(node.name) 
+      valType = cttc.findTypeInEnv(node.name) 
     } else {
-      stc.addToFrame(node.name, valType)
+      cttc.addToFrame(node.name, valType)
     }
 
     return {
@@ -238,13 +238,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
-    const arg = yield* evaluators[node.argument.type](node.argument, context)
-    const typeError = rttc.checkUnaryExpression(node, node.operator, {type: arg.type, value: 0})
-    if (typeError) {
-      throw typeError 
-    }
-    // get return type of unary expression
-    const type = rttc.operatorToResultType(node.operator, arg.type, arg.type)
+    const arg = yield* evaluators[node.argument.type](node.argument, context)    
+    const type = cttc.typeCheck(node, node.operator, [arg])
+
     return {
       tag: 'unop',
       sym: node.operator, 
@@ -257,16 +253,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
+    const type = cttc.typeCheck(node, node.operator, [frst, scnd])
 
-    const left = {type: frst.type, value: 0} 
-    const right = {type: scnd.type, value: 0}
-    // type check
-    const typeError = rttc.checkBinaryExpression(node, node.operator, left, right)
-    if (typeError) {
-      throw typeError
-    }
-    // push some dummy object containing type onto stack
-    const type = rttc.operatorToResultType(node.operator, frst.type, scnd.type)
     return {
       tag: 'binop',
       sym: node.operator,
@@ -333,21 +321,21 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       const decl = node.declarations[i]
       // deal with local declarations
       const locals = (decl as any).locals 
-      const initEnv = stc.getTypeEnv() 
+      const initEnv = cttc.getTypeEnv() 
       if (locals) {
-        stc.extendTypeEnv([], [])
+        cttc.extendTypeEnv([], [])
         localStartIdx = i
         localDecs = yield* evaluators[locals.decs.type](locals.decs, context)
         localArity = locals.arity
       }
 
-      stc.addToFrame((decl.id as any).name, "'a") // some unassigned type 
+      cttc.addToFrame((decl.id as any).name, "'a") // some unassigned type 
       const id = yield* evaluators[decl.id.type](decl.id, context)
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
 
       if (locals) {
-        stc.restoreTypeEnv(initEnv)
+        cttc.restoreTypeEnv(initEnv)
       }
 
       // check type of id against type of expr
@@ -361,10 +349,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
             rttc.typeToString(expr.type)
           )
         }
-        stc.addToFrame(id.sym, id.type) 
+        cttc.addToFrame(id.sym, id.type) 
       } else {
         // no type specified for var, use type of expr as type of var 
-        stc.addToFrame(id.sym, expr.type)
+        cttc.addToFrame(id.sym, expr.type)
       }
 
       ids.push(id)
@@ -413,9 +401,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const body = []
     let type = undefined 
     const locals = (node as any).locals
-    const initEnv = stc.getTypeEnv()  
+    const initEnv = cttc.getTypeEnv()  
     if (locals) {
-      stc.extendTypeEnv([], []) 
+      cttc.extendTypeEnv([], []) 
       const localDecs = yield* evaluators[locals.type](locals, context)
       body.push(localDecs)
     }
@@ -429,7 +417,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
     if (locals) {
       // restore env 
-      stc.restoreTypeEnv(initEnv)
+      cttc.restoreTypeEnv(initEnv)
     }
     
     return locals ? {
@@ -771,7 +759,7 @@ export function* evaluate(node: es.Node, context: Context): any {
   A = new Stack<any>()
   S = new Stack<Value>()
   E = createGlobalEnvironment()
-  stc.resetTypeEnv()
+  cttc.resetTypeEnv()
   console.log('=====START EVALUATION=====')
   A.push(yield* evaluators[node.type](node, context))
   let i = 0
@@ -799,6 +787,6 @@ export function* evaluate(node: es.Node, context: Context): any {
   console.log('\n=====EXIT EVALUATION=====\n')
   const r = S.pop()
   console.log(r)
-  console.log(stc.getTypeEnv().head)
+  console.log(cttc.getTypeEnv().head)
   return r.value
 }
