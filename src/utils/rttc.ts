@@ -185,6 +185,16 @@ export const typeToString = (type: SmlType) : string => {
   }
 }
 
+export const updateListLitType = (
+  currType: SmlType,
+  newType: SmlType,
+  node: es.Node
+) : SmlType => {
+  const dummyCurr = { type: currType, value: 0 }
+  const dummyNew = { type: newType, value: 0 }
+  return updateListType(dummyCurr, dummyNew, node).type 
+}
+
 export const updateListType = (
   currType: TypedValue,
   newType: TypedValue,
@@ -201,6 +211,11 @@ export const updateListType = (
   } else {
     throw new TypeError(node, ' or its subset', currType, newType)
   }
+}
+
+export const getListLitType = (first : SmlType | undefined) : SmlType => {
+  const dummy : TypedValue | undefined = first ? { type: first, value: 0 } : undefined 
+  return getDeclaredTypedList(dummy, null).type
 }
 
 export const getDeclaredTypedList = (first: TypedValue | undefined, val: any): TypedValue => {
@@ -251,7 +266,7 @@ export const getAppendedTypedList = (left: any, right: any, val: any): TypedValu
   let typeArr = left.type
 
   if (isFreeList(left)) {
-    typeArr = isFreeList(right) && getListDepth(left) < getListDepth(right) ? right.type : left.type
+    typeArr = isFreeList(right) || getListDepth(left) < getListDepth(right) ? right.type : left.type
   }
 
   return {
@@ -274,6 +289,20 @@ export const getTypedLiteral = (val: any): TypedValue => {
     }
   } else {
     throw Error('Unexpected literal to type')
+  }
+}
+
+export const getTypeFromVal = (val: any): SmlType => {
+  if (isBool(val)) {
+    return 'boolean'
+  } else if (isString(val)) {
+    return 'string'
+  } else if (isNumber(val)) {
+    return 'int'
+  } else if (isNil(val)) {
+    return ["'a", 'list']
+  } else {
+    throw Error('Unexpected literal value to type')
   }
 }
 
@@ -426,8 +455,12 @@ export const checkBinaryExpression = (
 }
 
 export const operatorToResultType = (
-  operator: es.BinaryOperator | es.UnaryOperator | '@' | '::'
+  operator: es.BinaryOperator | es.UnaryOperator | '@' | '::',
+  left: SmlType, 
+  right: SmlType
 ): SmlType => {
+  const dummyLeft = {type: left, value: 0}
+  const dummyRight = {type: right, value: 0}
   switch (operator) {
     case '^':
       return 'string'
@@ -445,9 +478,9 @@ export const operatorToResultType = (
     case '===':
       return 'boolean'
     case '::':
-      return 'list'
+      return getConstructedTypedList(dummyLeft, dummyRight, 0).type
     case '@':
-      return 'list'
+      return getAppendedTypedList(dummyLeft, dummyRight, 0).type
     default:
       return "'a"
   }
