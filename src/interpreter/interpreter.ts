@@ -239,21 +239,21 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
-    const type = cttc.typeCheck(node, node.operator, [arg])
+    const type = cttc.typeCheck(node, node.operator, [arg], "'a")
 
     return {
       tag: 'unop',
       sym: node.operator, 
       arg,
       loc: node.loc,
-      type
+      type: type?.return
     }
   },
 
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
-    const type = cttc.typeCheck(node, node.operator, [frst, scnd])
+    const type = cttc.typeCheck(node, node.operator, [frst, scnd], "'a")
 
     return {
       tag: 'binop',
@@ -261,7 +261,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       frst,
       scnd,
       loc: node.loc,
-      type
+      type: type?.return
     }
   },
 

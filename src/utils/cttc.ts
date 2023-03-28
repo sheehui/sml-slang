@@ -144,18 +144,16 @@ export class TypeError extends CompileTimeSourceError {
   public severity = ErrorSeverity.ERROR
   public location: es.SourceLocation
 
-  constructor(
-    node: es.Node,
-    public expected: FunctionType,
-    public got: any
-  ) {
+  constructor(node: es.Node | undefined, public expected: FunctionType, public got: any) {
     super(node)
     this.expected = expected
     this.got = got
   }
 
   public explain() {
-    return `Functions of type ${functionTypeToString(this.expected)} cannot take in arguments of type ${argToString(this.got)}.`
+    return `Functions of type ${functionTypeToString(
+      this.expected
+    )} cannot take in arguments of type ${argToString(this.got)}.`
   }
 
   public elaborate() {
@@ -187,7 +185,7 @@ const typeOf = (v: Value) => {
   }
 }
 
-export const isTypeEqual = (left: SmlType, right: SmlType): boolean => {
+const isTypeEqual = (left: SmlType, right: SmlType): boolean => {
   if ((isTypedList(left) && isTypedList(right)) || (isTypedTuple(left) && isTypedTuple(right))) {
     return right.toString() === left.toString()
   } else {
@@ -195,7 +193,7 @@ export const isTypeEqual = (left: SmlType, right: SmlType): boolean => {
   }
 }
 
-export const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
+const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
   if (typeof left === 'string' && typeof right === 'string') {
     return left === right
   } else if (typeof left !== 'string' && typeof right !== 'string') {
@@ -258,10 +256,10 @@ const functionTypeToString = (type: any): string => {
     if (i !== 0) {
       result += ' * '
     }
-    
+
     result += smlTypeToString(element)
   }
-  
+
   result += ' -> '
 
   result += smlTypeToString(type.return) // abit sus
@@ -277,14 +275,14 @@ const argToString = (type: any): string => {
     if (i !== 0) {
       result += ' * '
     }
-    
+
     result += smlTypeToString(element)
   }
 
   return result
 }
 
-export const smlTypeToString = (type: SmlType): string => {
+const smlTypeToString = (type: SmlType): string => {
   const isTypeArr = Array.isArray(type)
   if (isTypeArr && type[type.length - 1] == 'list') {
     let str = ''
@@ -352,7 +350,7 @@ export const getTypeFromVal = (val: any): SmlType => {
   }
 }
 
-export const findFunctionTypeInScheme = (vars: string): FunctionType | Array<FunctionType> => {
+const findFunctionTypeInScheme = (vars: string): FunctionType | Array<FunctionType> => {
   let env: TypeSchemeEnv | null = typeSchemeEnv
   while (env) {
     const frame: TypeSchemeFrame = env.head
@@ -364,27 +362,126 @@ export const findFunctionTypeInScheme = (vars: string): FunctionType | Array<Fun
   throw Error(`Unbound variable ${vars}`)
 }
 
-export const typeCheck = (
-  node: es.Node,
-  name: string,
-  args: Array<any>
-) => {
-  let expectedTypes : FunctionType | Array<FunctionType> = findFunctionTypeInScheme(name)
-  
+const constructFuncType = (args: Array<any>, ret: any): FunctionType => {
+  const params = []
+
+  for (let j = 0; j < args.length; j++) {
+    const arg = args[j]
+    params.push(arg.tag === 'id' ? findTypeInEnv(arg.sym) : arg.type)
+  }
+
+  return {
+    args: params,
+    return: ret
+  }
+}
+
+export const typeCheck = (node: es.Node, name: string, args: Array<any>, ret: any) => {
+  let expectedTypes: FunctionType | Array<FunctionType> = findFunctionTypeInScheme(name)
+  let found = undefined
+
   if (!Array.isArray(expectedTypes)) {
     expectedTypes = [expectedTypes]
   }
 
   for (let i = 0; i < expectedTypes.length; i++) {
-    const expectedType = expectedTypes[i]
-    for (let j = 0; j < expectedType.args.length; j++) {
-      const arg = args[j]
-      const argType = arg.tag === 'id' ? findTypeInEnv(arg.sym) : arg.type
-      if (isTypeSubset(expectedType.args[j], argType)) {
-        return expectedType.return
-      }    
+    const schemeType: FunctionType = expectedTypes[i]
+    const currType: FunctionType = constructFuncType(args, ret)
+    const substituted = unify(schemeType, currType)
+
+    if (substituted) {
+      found = substituted
+      break
+    }
+
+    if (substituted === undefined && i === expectedTypes.length - 1) {
+      throw new TypeError(node, expectedTypes[0], args)
     }
   }
 
-  throw new TypeError(node, expectedTypes[0], args)
+  return found
+}
+
+const constrainListType = (scheme: SmlType, given: SmlType) => {
+  if (isFreeList(scheme) && isFreeList(given)) {
+    return getListDepth(scheme) <= getListDepth(given) 
+      ? given 
+      : scheme
+  }
+
+  if (isFreeList(scheme) && !isFreeList(given)) {
+    return getListDepth(scheme) <= getListDepth(given) 
+      ? given 
+      : undefined
+  }
+
+  if (!isFreeList(scheme) && isFreeList(given)) {
+    return getListDepth(scheme) >= getListDepth(given)
+      ? scheme 
+      : undefined
+  }
+
+  if (!isFreeList(scheme) && !isFreeList(given)) {
+    return isTypeEqual(scheme, given) 
+      ? scheme 
+      : undefined
+  }
+
+  return undefined
+}
+
+const constrainLiteralType = (scheme: SmlType, given: SmlType) => {
+  if (isFreeLiteral(scheme) && !isFreeLiteral(given)) {
+    return given
+  }
+
+  if (isFreeLiteral(given) && !isFreeLiteral(scheme)) {
+    return scheme
+  }
+
+  return scheme
+}
+
+const constrainType = (scheme: SmlType, given: SmlType) => {
+  if (isTypedList(scheme) && isTypedList(given)) {
+    return constrainListType(scheme, given)
+  }
+
+  if (isTypedTuple(scheme) && isTypedTuple(given)) {
+    // recursion
+  }
+
+  if (isFreeLiteral(scheme) || isFreeLiteral(given)) {
+    return constrainLiteralType(scheme, given)
+  }
+
+  return typeArrEqual(scheme, given) ? scheme : undefined
+}
+
+const unify = (schemeType: FunctionType, givenType: FunctionType) => {
+  if (schemeType.args.length !== givenType.args.length) {
+    return undefined
+  }
+
+  const args = []
+
+  for (let i = 0; i < schemeType.args.length; i++) {
+    const schemeElem = schemeType.args[i]
+    const givenElem = givenType.args[i]
+    const substitued = constrainType(schemeElem, givenElem)
+    if (substitued === undefined) {
+      return undefined
+    }
+    args.push(substitued)
+  }
+
+  const resultType = constrainType(schemeType.return, givenType.return)
+  if (resultType === undefined) { // wrong error msg
+    return undefined
+  }
+
+  return {
+    args,
+    return: resultType
+  }
 }
