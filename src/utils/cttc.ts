@@ -225,29 +225,6 @@ const getListDepth = (v: SmlType) => {
   throw Error('cannot get list depth of non-list type')
 }
 
-const isTypeSubset = (superset: SmlType, subset: SmlType): boolean => {
-  console.log(superset, subset)
-  if (isTypedList(superset) && isTypedList(subset)) {
-    return isFreeList(superset)
-      ? isFreeList(subset)
-        ? true
-        : getListDepth(superset) <= getListDepth(subset)
-      : isFreeList(subset)
-      ? getListDepth(superset) >= getListDepth(subset)
-      : isTypeEqual(superset, subset)
-  }
-
-  if (isTypedTuple(superset) && isTypedTuple(subset)) {
-    // recursion
-  }
-
-  if (isFreeLiteral(superset) || isFreeLiteral(subset)) {
-    return true
-  }
-
-  return typeArrEqual(superset, subset)
-}
-
 const functionTypeToString = (type: any): string => {
   let result = ''
 
@@ -392,9 +369,8 @@ export const typeCheck = (node: es.Node, name: string, args: Array<any>, ret: an
     if (substituted) {
       found = substituted
       break
-    }
-
-    if (substituted === undefined && i === expectedTypes.length - 1) {
+    } else if (i === expectedTypes.length - 1) {
+      // no more possible scheme to match
       throw new TypeError(node, expectedTypes[0], args)
     }
   }
@@ -404,27 +380,19 @@ export const typeCheck = (node: es.Node, name: string, args: Array<any>, ret: an
 
 const constrainListType = (scheme: SmlType, given: SmlType) => {
   if (isFreeList(scheme) && isFreeList(given)) {
-    return getListDepth(scheme) <= getListDepth(given) 
-      ? given 
-      : scheme
+    return getListDepth(scheme) <= getListDepth(given) ? given : scheme
   }
 
   if (isFreeList(scheme) && !isFreeList(given)) {
-    return getListDepth(scheme) <= getListDepth(given) 
-      ? given 
-      : undefined
+    return getListDepth(scheme) <= getListDepth(given) ? given : undefined
   }
 
   if (!isFreeList(scheme) && isFreeList(given)) {
-    return getListDepth(scheme) >= getListDepth(given)
-      ? scheme 
-      : undefined
+    return getListDepth(scheme) >= getListDepth(given) ? scheme : undefined
   }
 
   if (!isFreeList(scheme) && !isFreeList(given)) {
-    return isTypeEqual(scheme, given) 
-      ? scheme 
-      : undefined
+    return isTypeEqual(scheme, given) ? scheme : undefined
   }
 
   return undefined
@@ -475,8 +443,13 @@ const unify = (schemeType: FunctionType, givenType: FunctionType) => {
     args.push(substitued)
   }
 
+  if (!givenType.return) {
+    givenType.return = "'a"
+  }
+
   const resultType = constrainType(schemeType.return, givenType.return)
-  if (resultType === undefined) { // wrong error msg
+  if (!resultType) {
+    // wrong error msg
     return undefined
   }
 

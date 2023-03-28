@@ -239,7 +239,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
-    const type = cttc.typeCheck(node, node.operator, [arg], "'a")
+    const type = cttc.typeCheck(node, node.operator, [arg], undefined)
 
     return {
       tag: 'unop',
@@ -253,7 +253,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
-    const type = cttc.typeCheck(node, node.operator, [frst, scnd], "'a")
+    const type = cttc.typeCheck(node, node.operator, [frst, scnd], undefined)
 
     return {
       tag: 'binop',
@@ -475,7 +475,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 }
 
 const microcode: { [tag: string]: Function } = {
-  blk: (cmd: { body: any; }) => {
+  blk: (cmd: { body: any }) => {
     if (A.size() > 0) {
       A.push({ tag: 'env_i', env: E })
     }
@@ -490,7 +490,7 @@ const microcode: { [tag: string]: Function } = {
       name: 'program'
     }
   },
-  seq: (cmd: { body: any[]; }) => {
+  seq: (cmd: { body: any[] }) => {
     for (let i = cmd.body.length - 1; i >= 0; i--) {
       const expr = cmd.body[i]
       A.push(expr)
@@ -500,10 +500,10 @@ const microcode: { [tag: string]: Function } = {
       A.push({ tag: 'pop_i' })
     }
   },
-  lit: (cmd: { val: any; }) => {
+  lit: (cmd: { val: any }) => {
     S.push(rttc.getTypedLiteral(cmd.val))
   },
-  id: (cmd: { sym: string; }) => {
+  id: (cmd: { sym: string }) => {
     let env: Environment | null = E
     while (env) {
       const frame = env.head
@@ -514,12 +514,7 @@ const microcode: { [tag: string]: Function } = {
     }
     throw Error(`Unbound variable ${cmd.sym}`)
   },
-  binop: (cmd: {
-    sym: es.BinaryOperator
-    scnd: any
-    frst: any
-    loc: es.SourceLocation
-  }) => {
+  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; loc: es.SourceLocation }) => {
     A.push({
       tag: 'binop_i',
       sym: cmd.sym,
@@ -528,7 +523,7 @@ const microcode: { [tag: string]: Function } = {
     A.push(cmd.frst)
     A.push(cmd.scnd)
   },
-  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation; }) => {
+  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation }) => {
     A.push({
       tag: 'unop_i',
       sym: cmd.sym,
@@ -554,7 +549,7 @@ const microcode: { [tag: string]: Function } = {
         id: cmd.ids[i],
         expr: cmd.exprs[i],
         // frameOffset to skip the temp frame (if declaration is within 'local...in<HERE>end')
-        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0,
+        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0
       })
 
       if (i !== 0) {
@@ -577,7 +572,7 @@ const microcode: { [tag: string]: Function } = {
       }
     }
   },
-  assmt: (cmd: { id: any; expr: any; frameOffset: number; }) => {
+  assmt: (cmd: { id: any; expr: any; frameOffset: number }) => {
     A.push({ tag: 'assmt_i', id: cmd.id, frameOffset: cmd.frameOffset })
     A.push(cmd.expr)
   },
@@ -590,21 +585,13 @@ const microcode: { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  list_append: (cmd: {
-    elems: any[]
-    node: es.ArrayExpression
-    loc: es.SourceLocation
-  }) => {
+  list_append: (cmd: { elems: any[]; node: es.ArrayExpression; loc: es.SourceLocation }) => {
     A.push({ tag: 'list_append_i', len: cmd.elems.length, loc: cmd.loc })
     cmd.elems.forEach(x => {
       A.push(x)
     })
   },
-  list_construct: (cmd: {
-    elems: any[]
-    node: es.ArrayExpression
-    loc: es.SourceLocation
-  }) => {
+  list_construct: (cmd: { elems: any[]; node: es.ArrayExpression; loc: es.SourceLocation }) => {
     A.push({ tag: 'list_construct_i', loc: cmd.loc })
     cmd.elems.forEach(x => {
       A.push(x)
@@ -626,19 +613,14 @@ const microcode: { [tag: string]: Function } = {
       A.push(cmd.expr)
     }
   },
-  app: (cmd: { args: any[]; fun: any; }) => {
+  app: (cmd: { args: any[]; fun: any }) => {
     A.push({ tag: 'app_i', arity: cmd.args.length })
     for (let i = 0; i < cmd.args.length; i++) {
       A.push(cmd.args[i])
     }
     A.push(cmd.fun)
   },
-  cond_expr: (cmd: {
-    pred: any
-    cons: any
-    alt: any
-    node: es.ConditionalExpression
-  }) => {
+  cond_expr: (cmd: { pred: any; cons: any; alt: any; node: es.ConditionalExpression }) => {
     A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node })
     A.push(cmd.pred)
   },
@@ -668,7 +650,7 @@ const microcode: { [tag: string]: Function } = {
     E = cmd.env
   },
   assmt_i: (cmd: { id: any; frameOffset: number }) => {
-    const val = S.peek() 
+    const val = S.peek()
     if (cmd.frameOffset && E.tail) {
       return (E.tail.head[cmd.id.sym] = val)
     }
@@ -743,7 +725,7 @@ const microcode: { [tag: string]: Function } = {
     }
   },
   branch_i: (cmd: { cons: any; alt: any; node: es.ConditionalExpression; isCheck: boolean }) => {
-    const pred = S.pop() 
+    const pred = S.pop()
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
   closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
