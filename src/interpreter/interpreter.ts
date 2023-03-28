@@ -239,7 +239,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
-    const type = cttc.typeSchemeCheck(node, node.operator, [arg], undefined)
+    const type = cttc.typeSchemeCheck(node.operator, [arg], undefined)
 
     return {
       tag: 'unop',
@@ -253,7 +253,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
-    const type = cttc.typeSchemeCheck(node, node.operator, [scnd, frst], undefined)
+    const type = cttc.typeSchemeCheck(node.operator, [scnd, frst], undefined)
 
     return {
       tag: 'binop',

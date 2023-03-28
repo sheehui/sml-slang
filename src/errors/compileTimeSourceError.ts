@@ -27,8 +27,8 @@ export class FunctionTypeError extends CompileTimeSourceError {
   public severity = ErrorSeverity.ERROR
   public location: es.SourceLocation
 
-  constructor(node: es.Node | undefined, public expected: FunctionType, public got: any) {
-    super(node)
+  constructor(public expected: FunctionType, public got: any) {
+    super()
     this.expected = expected
     this.got = got
   }
@@ -50,7 +50,7 @@ export class ReturnTypeError extends CompileTimeSourceError {
   public location: es.SourceLocation
 
   constructor(public expected: SmlType, public got: SmlType) {
-    super(undefined)
+    super()
     this.expected = expected
     this.got = got
   }

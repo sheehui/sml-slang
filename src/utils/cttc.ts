@@ -159,7 +159,7 @@ const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType> => {
  * Type Checking Support
  */
 
-export const typeSchemeCheck = (node: es.Node, name: string, args: Array<any>, ret: any) => {
+export const typeSchemeCheck = (name: string, args: Array<any>, ret: any) => {
   let expectedTypes: FunctionType | Array<FunctionType> = findSchemeInEnv(name)
   let found = undefined
 
@@ -177,7 +177,7 @@ export const typeSchemeCheck = (node: es.Node, name: string, args: Array<any>, r
       break
     } else if (i === expectedTypes.length - 1) {
       // no more possible scheme to match
-      throw new FunctionTypeError(node, expectedTypes[0], args)
+      throw new FunctionTypeError(expectedTypes[0], args)
     }
   }
 
