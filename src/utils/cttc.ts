@@ -219,9 +219,9 @@ export class TypeError extends CompileTimeSourceError {
   }
 
   public explain() {
-    return `Functions of type ${functionTypeToString(
+    return `Functions of type "${functionTypeToString(
       this.expected
-    )} cannot take in arguments of type ${argToString(this.got)}.`
+    )}" cannot take in an argument of type "${argToString(this.got)}".`
   }
 
   public elaborate() {
@@ -338,7 +338,7 @@ const argToString = (type: any): string => {
   let result = ''
 
   for (let i = 0; i < type.length; i++) {
-    const element = type.args[i]
+    const element = type[i].type
     if (i !== 0) {
       result += ' * '
     }

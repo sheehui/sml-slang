@@ -253,7 +253,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
-    const type = cttc.typeSchemeCheck(node, node.operator, [frst, scnd], undefined)
+    const type = cttc.typeSchemeCheck(node, node.operator, [scnd, frst], undefined)
 
     return {
       tag: 'binop',
