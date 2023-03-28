@@ -177,7 +177,7 @@ export const typeSchemeCheck = (node: es.Node, name: string, args: Array<any>, r
       break
     } else if (i === expectedTypes.length - 1) {
       // no more possible scheme to match
-      throw new TypeError(node, expectedTypes[0], args)
+      throw new FunctionTypeError(node, expectedTypes[0], args)
     }
   }
 
@@ -227,7 +227,7 @@ export const unifyReturnType = (annotation: SmlType, actual: SmlType) => {
   return type
 }
 
-export class TypeError extends CompileTimeSourceError {
+export class FunctionTypeError extends CompileTimeSourceError {
   public type = ErrorType.COMPILE_TIME
   public severity = ErrorSeverity.ERROR
   public location: es.SourceLocation
