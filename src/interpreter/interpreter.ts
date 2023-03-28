@@ -239,7 +239,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
-    const type = cttc.typeCheck(node, node.operator, [arg], undefined)
+    const type = cttc.typeSchemeCheck(node, node.operator, [arg], undefined)
 
     return {
       tag: 'unop',
@@ -253,7 +253,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
-    const type = cttc.typeCheck(node, node.operator, [frst, scnd], undefined)
+    const type = cttc.typeSchemeCheck(node, node.operator, [frst, scnd], undefined)
 
     return {
       tag: 'binop',
@@ -279,7 +279,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
     const pred = yield* evaluators[node.test.type](node.test, context)
-    if (!rttc.typeArrEqual(pred.type, 'boolean')) {
+    if (!rttc.typeArrEqual(pred.type, 'bool')) {
       throw new rttc.TypeError(node, " as predicate", 'boolean', pred.type)
     }
     const cons = yield* evaluators[node.consequent.type](node.consequent, context)
@@ -329,7 +329,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         localArity = locals.arity
       }
 
-      cttc.addToFrame((decl.id as any).name, "'a") // some unassigned type 
+      cttc.addToFrame((decl.id as any).name, 'free') // assign initial free type
       const id = yield* evaluators[decl.id.type](decl.id, context)
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
@@ -338,23 +338,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         cttc.restoreTypeEnv(initEnv)
       }
 
-      // check type of id against type of expr
-      if (id.type !== "'a") {
-        // unify
-        if (!rttc.isTypeArrSubset(expr.type, id.type)) {
-          throw new rttc.TypeError(
-            node,
-            ' as assigned value',
-            rttc.typeToString(id.type),
-            rttc.typeToString(expr.type)
-          )
-        }
-        cttc.addToFrame(id.sym, id.type) 
-      } else {
-        // no type specified for var, use type of expr as type of var 
-        cttc.addToFrame(id.sym, expr.type)
-      }
-
+      const type = cttc.unifyReturnType(id.type, expr.type)
+      cttc.addToFrame(id.sym, type) 
+      
       ids.push(id)
       exprs.push(expr)
     }

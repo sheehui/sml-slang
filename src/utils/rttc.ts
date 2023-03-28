@@ -42,7 +42,7 @@ const isNil = (v: Value) => typeOf(v) === 'null'
 
 const isTypedNumber = (v: TypedValue) => v.type === 'int'
 const isTypedString = (v: TypedValue) => v.type === 'string'
-const isTypedBool = (v: TypedValue) => v.type === 'boolean'
+const isTypedBool = (v: TypedValue) => v.type === 'bool'
 const isFreeLiteral = (v: TypedValue) => v.type === "'a"
 const isTypedList = (v: TypedValue) =>
   Array.isArray(v.type) && v.type[v.type.length - 1] === 'list' 
@@ -277,7 +277,7 @@ export const getAppendedTypedList = (left: any, right: any, val: any): TypedValu
 
 export const getTypedLiteral = (val: any): TypedValue => {
   if (isBool(val)) {
-    return { type: 'boolean', value: val }
+    return { type: 'bool', value: val }
   } else if (isString(val)) {
     return { type: 'string', value: val }
   } else if (isNumber(val)) {
@@ -294,7 +294,7 @@ export const getTypedLiteral = (val: any): TypedValue => {
 
 export const getTypeFromVal = (val: any): SmlType => {
   if (isBool(val)) {
-    return 'boolean'
+    return 'bool'
   } else if (isString(val)) {
     return 'string'
   } else if (isNumber(val)) {
@@ -478,7 +478,7 @@ export const operatorToResultType = (
     case '!':
     case '!==':
     case '===':
-      return 'boolean'
+      return 'bool'
     case '::':
       return getConstructedTypedList(dummyLeft, dummyRight, 0).type
     case '@':

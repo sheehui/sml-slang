@@ -578,9 +578,6 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
 class TypeGenerator implements SmlSlangVisitor<SmlType> {
   visitLitType(ctx: LitTypeContext): SmlType {
     const type = ctx.TYPE()._symbol.text
-    if (type === 'bool') {
-      return 'boolean'
-    }
     return type as SmlType
   }
   visitListType(ctx: ListTypeContext): SmlType {

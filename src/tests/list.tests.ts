@@ -30,7 +30,7 @@ describe('list creation with []', () => {
   test('literals of different types', () => {
     const code: string = '[1, true, 3];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int or its subset, got boolean.')
+      expect(error.explain()).toMatch('Expected int or its subset, got bool.')
     })
   })
 
@@ -105,7 +105,7 @@ describe('list construction with :: and nil', () => {
   test('list of different types', () => {
     const code: string = '1::true::5::nil;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int on left hand side of operation, got boolean.')
+      expect(error.explain()).toMatch('Expected int on left hand side of operation, got bool.')
     })
   })
 
@@ -184,7 +184,7 @@ describe('list append with @', () => {
     const code: string = '[1]@[2]@[true];'
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'Expected int list on right hand side of @, got boolean list.'
+        'Expected int list on right hand side of @, got bool list.'
       )
     })
   })

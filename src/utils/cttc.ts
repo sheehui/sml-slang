@@ -10,30 +10,30 @@ let typeEnv: TypeEnv = {
 
 const PRIM_TYPE_SCHEME: TypeSchemeFrame = {
   '~': { args: ['int'], return: 'int' },
-  '!': { args: ['boolean'], return: 'boolean' },
+  '!': { args: ['bool'], return: 'bool' },
   '+': { args: ['int', 'int'], return: 'int' },
   '-': { args: ['int', 'int'], return: 'int' },
   '/': { args: ['int', 'int'], return: 'int' },
   '*': { args: ['int', 'int'], return: 'int' },
   '%': { args: ['int', 'int'], return: 'int' },
   '^': { args: ['string', 'string'], return: 'string' },
-  '!==': { args: ["'a", "'a"], return: 'boolean' },
-  '===': { args: ["'a", "'a"], return: 'boolean' },
+  '!==': { args: ["'a", "'a"], return: 'bool' },
+  '===': { args: ["'a", "'a"], return: 'bool' },
   '>': [
-    { args: ['int', 'int'], return: 'boolean' },
-    { args: ['string', 'string'], return: 'boolean' }
+    { args: ['int', 'int'], return: 'bool' },
+    { args: ['string', 'string'], return: 'bool' }
   ],
   '>=': [
-    { args: ['int', 'int'], return: 'boolean' },
-    { args: ['string', 'string'], return: 'boolean' }
+    { args: ['int', 'int'], return: 'bool' },
+    { args: ['string', 'string'], return: 'bool' }
   ],
   '<': [
-    { args: ['int', 'int'], return: 'boolean' },
-    { args: ['string', 'string'], return: 'boolean' }
+    { args: ['int', 'int'], return: 'bool' },
+    { args: ['string', 'string'], return: 'bool' }
   ],
   '<=': [
-    { args: ['int', 'int'], return: 'boolean' },
-    { args: ['string', 'string'], return: 'boolean' }
+    { args: ['int', 'int'], return: 'bool' },
+    { args: ['string', 'string'], return: 'bool' }
   ]
 }
 
@@ -139,6 +139,74 @@ export const initTypeSchemeEnv = () => {
  * Type Checking Support
  */
 
+export const typeSchemeCheck = (node: es.Node, name: string, args: Array<any>, ret: any) => {
+  let expectedTypes: FunctionType | Array<FunctionType> = findFunctionTypeInScheme(name)
+  let found = undefined
+
+  if (!Array.isArray(expectedTypes)) {
+    expectedTypes = [expectedTypes]
+  }
+
+  for (let i = 0; i < expectedTypes.length; i++) {
+    const schemeType: FunctionType = expectedTypes[i]
+    const currType: FunctionType = constructFuncType(args, ret)
+    const substituted = unifyScheme(schemeType, currType)
+
+    if (substituted) {
+      found = substituted
+      break
+    } else if (i === expectedTypes.length - 1) {
+      // no more possible scheme to match
+      throw new TypeError(node, expectedTypes[0], args)
+    }
+  }
+
+  return found
+}
+
+const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
+  if (schemeType.args.length !== givenType.args.length) {
+    return undefined
+  }
+
+  const args = []
+
+  for (let i = 0; i < schemeType.args.length; i++) {
+    const schemeElem = schemeType.args[i]
+    const givenElem = givenType.args[i]
+    const substitued = constrainType(schemeElem, givenElem)
+    if (substitued === undefined) {
+      return undefined
+    }
+    args.push(substitued)
+  }
+
+  // if (!givenType.return) { // undefined
+  //   givenType.return = "'a"
+  // }
+
+  const resultType = constrainType(schemeType.return, givenType.return)
+  if (!resultType) {
+    // wrong error msg
+    return undefined
+  }
+
+  return {
+    args,
+    return: resultType
+  }
+}
+
+export const unifyReturnType = (annotation: SmlType, actual: SmlType) => {
+  const type = constrainType(annotation, actual)
+
+  if (!type) {
+    throw new ReturnTypeError(annotation, actual)
+  }
+
+  return type
+}
+
 export class TypeError extends CompileTimeSourceError {
   public type = ErrorType.COMPILE_TIME
   public severity = ErrorSeverity.ERROR
@@ -161,6 +229,28 @@ export class TypeError extends CompileTimeSourceError {
   }
 }
 
+export class ReturnTypeError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
+
+  constructor(public expected: SmlType, public got: SmlType) {
+    super(undefined)
+    this.expected = expected
+    this.got = got
+  }
+
+  public explain() {
+    return `The annotated type "${smlTypeToString(
+      this.expected
+    )}" does not match expression's type "${smlTypeToString(this.got)}".`
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
 const isNumber = (v: Value) => typeOf(v) === 'number'
 const isString = (v: Value) => typeOf(v) === 'string'
 const isBool = (v: Value) => typeOf(v) === 'boolean'
@@ -168,7 +258,7 @@ const isNil = (v: Value) => typeOf(v) === 'null'
 
 const isTypedNumber = (v: SmlType) => v === 'int'
 const isTypedString = (v: SmlType) => v === 'string'
-const isTypedBool = (v: SmlType) => v === 'boolean'
+const isTypedBool = (v: SmlType) => v === 'bool'
 const isFreeLiteral = (v: SmlType) => v === "'a"
 const isTypedList = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'list'
 const isFreeList = (v: SmlType) => isTypedList(v) && v[0] === "'a"
@@ -315,7 +405,7 @@ const smlTypeToString = (type: SmlType): string => {
 
 export const getTypeFromVal = (val: any): SmlType => {
   if (isBool(val)) {
-    return 'boolean'
+    return 'bool'
   } else if (isString(val)) {
     return 'string'
   } else if (isNumber(val)) {
@@ -353,31 +443,6 @@ const constructFuncType = (args: Array<any>, ret: any): FunctionType => {
   }
 }
 
-export const typeCheck = (node: es.Node, name: string, args: Array<any>, ret: any) => {
-  let expectedTypes: FunctionType | Array<FunctionType> = findFunctionTypeInScheme(name)
-  let found = undefined
-
-  if (!Array.isArray(expectedTypes)) {
-    expectedTypes = [expectedTypes]
-  }
-
-  for (let i = 0; i < expectedTypes.length; i++) {
-    const schemeType: FunctionType = expectedTypes[i]
-    const currType: FunctionType = constructFuncType(args, ret)
-    const substituted = unify(schemeType, currType)
-
-    if (substituted) {
-      found = substituted
-      break
-    } else if (i === expectedTypes.length - 1) {
-      // no more possible scheme to match
-      throw new TypeError(node, expectedTypes[0], args)
-    }
-  }
-
-  return found
-}
-
 const constrainListType = (scheme: SmlType, given: SmlType) => {
   if (isFreeList(scheme) && isFreeList(given)) {
     return getListDepth(scheme) <= getListDepth(given) ? given : scheme
@@ -410,7 +475,15 @@ const constrainLiteralType = (scheme: SmlType, given: SmlType) => {
   return scheme
 }
 
-const constrainType = (scheme: SmlType, given: SmlType) => {
+const constrainType = (scheme: SmlType, given: SmlType | undefined) => {
+  if (!given) {
+    return scheme
+  }
+
+  if (scheme === 'free') {
+    return given
+  }
+
   if (isTypedList(scheme) && isTypedList(given)) {
     return constrainListType(scheme, given)
   }
@@ -424,37 +497,4 @@ const constrainType = (scheme: SmlType, given: SmlType) => {
   }
 
   return typeArrEqual(scheme, given) ? scheme : undefined
-}
-
-const unify = (schemeType: FunctionType, givenType: FunctionType) => {
-  if (schemeType.args.length !== givenType.args.length) {
-    return undefined
-  }
-
-  const args = []
-
-  for (let i = 0; i < schemeType.args.length; i++) {
-    const schemeElem = schemeType.args[i]
-    const givenElem = givenType.args[i]
-    const substitued = constrainType(schemeElem, givenElem)
-    if (substitued === undefined) {
-      return undefined
-    }
-    args.push(substitued)
-  }
-
-  if (!givenType.return) {
-    givenType.return = "'a"
-  }
-
-  const resultType = constrainType(schemeType.return, givenType.return)
-  if (!resultType) {
-    // wrong error msg
-    return undefined
-  }
-
-  return {
-    args,
-    return: resultType
-  }
 }
