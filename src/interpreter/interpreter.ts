@@ -164,13 +164,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const initEnv = cttc.getTypeEnv()
     cttc.extendTypeEnv([], []) 
     for (let i = 0; i < node.params.length; i++) {
-      cttc.addToFrame((node.params[i] as any).name, "'a") // some unassigned type
+      cttc.addToTypeFrame((node.params[i] as any).name, "'a") // some unassigned type
 
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
       params.push(param)
       paramsTypes.push(param.type)
 
-      cttc.addToFrame(param.sym, param.type)
+      cttc.addToTypeFrame(param.sym, param.type)
     }
     paramsTypes.push('tuple')
     paramsTypes = paramsTypes.length <= 2 ? paramsTypes[0] : paramsTypes
@@ -196,7 +196,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     if (!valType) {
       valType = cttc.findTypeInEnv(node.name) 
     } else {
-      cttc.addToFrame(node.name, valType)
+      cttc.addToTypeFrame(node.name, valType)
     }
 
     return {
@@ -329,7 +329,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         localArity = locals.arity
       }
 
-      cttc.addToFrame((decl.id as any).name, 'free') // assign initial free type
+      cttc.addToTypeFrame((decl.id as any).name, 'free') // assign initial free type
       const id = yield* evaluators[decl.id.type](decl.id, context)
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
@@ -339,7 +339,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       }
 
       const type = cttc.unifyReturnType(id.type, expr.type)
-      cttc.addToFrame(id.sym, type) 
+      cttc.addToTypeFrame(id.sym, type) 
       
       ids.push(id)
       exprs.push(expr)

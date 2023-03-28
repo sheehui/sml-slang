@@ -78,7 +78,7 @@ export const extendTypeEnv = (vars: string[], types: SmlType[]): TypeEnv => {
   return typeEnv
 }
 
-export const addToFrame = (vars: string, type: SmlType) => {
+export const addToTypeFrame = (vars: string, type: SmlType) => {
   typeEnv.head[vars] = type
 }
 
@@ -128,11 +128,31 @@ export interface TypeSchemeFrame {
   [name: string]: FunctionType | Array<FunctionType>
 }
 
-export const initTypeSchemeEnv = () => {
+export const resetSchemeEnv = () => {
   typeSchemeEnv = {
     head: PRIM_TYPE_SCHEME,
     tail: null
   }
+}
+
+export const addToSchemeFrame = (vars: string, type: FunctionType | Array<FunctionType>) => {
+  typeSchemeEnv.head[vars] = type
+}
+
+export const restoreSchemeEnv = (env: TypeSchemeEnv) => {
+  typeSchemeEnv = env
+}
+
+const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType> => {
+  let env: TypeSchemeEnv | null = typeSchemeEnv
+  while (env) {
+    const frame: TypeSchemeFrame = env.head
+    if (frame.hasOwnProperty(vars)) {
+      return frame[vars]
+    }
+    env = env.tail
+  }
+  throw Error(`Unbound variable ${vars}`)
 }
 
 /**
@@ -140,7 +160,7 @@ export const initTypeSchemeEnv = () => {
  */
 
 export const typeSchemeCheck = (node: es.Node, name: string, args: Array<any>, ret: any) => {
-  let expectedTypes: FunctionType | Array<FunctionType> = findFunctionTypeInScheme(name)
+  let expectedTypes: FunctionType | Array<FunctionType> = findSchemeInEnv(name)
   let found = undefined
 
   if (!Array.isArray(expectedTypes)) {
@@ -415,18 +435,6 @@ export const getTypeFromVal = (val: any): SmlType => {
   } else {
     throw Error('Unexpected literal value to type')
   }
-}
-
-const findFunctionTypeInScheme = (vars: string): FunctionType | Array<FunctionType> => {
-  let env: TypeSchemeEnv | null = typeSchemeEnv
-  while (env) {
-    const frame: TypeSchemeFrame = env.head
-    if (frame.hasOwnProperty(vars)) {
-      return frame[vars]
-    }
-    env = env.tail
-  }
-  throw Error(`Unbound variable ${vars}`)
 }
 
 const constructFuncType = (args: Array<any>, ret: any): FunctionType => {
