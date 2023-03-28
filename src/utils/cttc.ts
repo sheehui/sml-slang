@@ -1,7 +1,7 @@
 import * as es from 'estree'
 
-import { CompileTimeSourceError } from '../errors/compileTimeSourceError'
-import { ErrorSeverity, ErrorType, SmlType, TypedValue, Value } from '../types'
+import { CompileTimeSourceError, FunctionTypeError, ReturnTypeError } from '../errors/compileTimeSourceError'
+import { ErrorSeverity, ErrorType, SmlType, Value } from '../types'
 
 let typeEnv: TypeEnv = {
   head: {},
@@ -119,7 +119,7 @@ export interface TypeSchemeEnv {
   head: TypeSchemeFrame
 }
 
-interface FunctionType {
+export interface FunctionType {
   args: Array<SmlType>
   return: SmlType
 }
@@ -227,50 +227,6 @@ export const unifyReturnType = (annotation: SmlType, actual: SmlType) => {
   return type
 }
 
-export class FunctionTypeError extends CompileTimeSourceError {
-  public type = ErrorType.COMPILE_TIME
-  public severity = ErrorSeverity.ERROR
-  public location: es.SourceLocation
-
-  constructor(node: es.Node | undefined, public expected: FunctionType, public got: any) {
-    super(node)
-    this.expected = expected
-    this.got = got
-  }
-
-  public explain() {
-    return `Functions of type "${functionTypeToString(
-      this.expected
-    )}" cannot take in an argument of type "${argToString(this.got)}".`
-  }
-
-  public elaborate() {
-    return this.explain()
-  }
-}
-
-export class ReturnTypeError extends CompileTimeSourceError {
-  public type = ErrorType.COMPILE_TIME
-  public severity = ErrorSeverity.ERROR
-  public location: es.SourceLocation
-
-  constructor(public expected: SmlType, public got: SmlType) {
-    super(undefined)
-    this.expected = expected
-    this.got = got
-  }
-
-  public explain() {
-    return `The annotated type "${smlTypeToString(
-      this.expected
-    )}" does not match expression's type "${smlTypeToString(this.got)}".`
-  }
-
-  public elaborate() {
-    return this.explain()
-  }
-}
-
 const isNumber = (v: Value) => typeOf(v) === 'number'
 const isString = (v: Value) => typeOf(v) === 'string'
 const isBool = (v: Value) => typeOf(v) === 'boolean'
@@ -334,94 +290,6 @@ const getListDepth = (v: SmlType) => {
   }
   throw Error('cannot get list depth of non-list type')
 }
-
-const functionTypeToString = (type: any): string => {
-  let result = ''
-
-  for (let i = 0; i < type.args.length; i++) {
-    const element = type.args[i]
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
-  }
-
-  result += ' -> '
-
-  result += smlTypeToString(type.return) // abit sus
-
-  return result
-}
-
-const argToString = (type: any): string => {
-  let result = ''
-
-  for (let i = 0; i < type.length; i++) {
-    const element = type[i].type
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
-  }
-
-  return result
-}
-
-const smlTypeToString = (type: SmlType): string => {
-  const isTypeArr = Array.isArray(type)
-  if (isTypeArr && type[type.length - 1] == 'list') {
-    let str = ''
-
-    type.forEach((element: SmlType | Array<SmlType>) => {
-      if (Array.isArray(element)) {
-        str += ' ' + smlTypeToString(element)
-      } else {
-        str += ' ' + element
-      }
-    })
-
-    return str.trim()
-  } else if (isTypeArr && type[type.length - 1] == 'tuple') {
-    let str = '('
-
-    for (let i = 0; i < type.length - 1; i++) {
-      const element = type[i]
-      if (i !== 0) {
-        str += ' * '
-      }
-      if (Array.isArray(element)) {
-        str += smlTypeToString(element)
-      } else {
-        str += element
-      }
-    }
-    str += ')'
-
-    return str
-  } else if (isTypeArr && type[type.length - 1] == 'fun') {
-    const paramsType = Array.isArray(type[0]) ? smlTypeToString(type[0]) : type[0]
-    const retType = Array.isArray(type[1]) ? smlTypeToString(type[1]) : type[1]
-
-    return `${paramsType} -> ${retType}`
-  } else {
-    return type.toString()
-  }
-}
-
-// const getTypeString = (val: TypedValue | string): string => {
-//   if (typeof val === 'string') {
-//     return val
-//   } else if (Array.isArray(val.type)) {
-//     if (isTypedList(val) || isTypedTuple(val)) {
-//       return smlTypeToString(val.type)
-//     }
-//     throw Error('Unable to get type of non-list/tuple array for SmlType.type')
-//   } else {
-//     return val.type
-//   }
-// }
 
 export const getTypeFromVal = (val: any): SmlType => {
   if (isBool(val)) {
