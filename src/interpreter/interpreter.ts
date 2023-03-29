@@ -116,7 +116,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     let type = undefined
 
     if (tag === 'list_lit') {
-      for (let i = 0; i < node.elements.length; i++) {
+      for (let i = node.elements.length - 1; i >= 0; i--) { // right assoc
         const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
         elems.push(elem)
         if (!type) {
@@ -125,6 +125,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         type = cttc.unifyListLitType(type, elem.type)
       }
       type = cttc.getDeclaredListType(type)
+      elems.reverse()
     } else if (tag === 'tuple_lit') {
       type = []
       for (let i = 0; i < node.elements.length; i++) {

@@ -31,7 +31,7 @@ describe('list creation with []', () => {
     const code: string = '[1, true, 3];'
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "int * bool".'
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "bool * int".'
       )
     })
   })
@@ -47,7 +47,7 @@ describe('list creation with []', () => {
     const code: string = '[[1], ["hello"], [3]];'
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "int list * string list list".'
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "string list * int list list".'
       )
     })
   })
