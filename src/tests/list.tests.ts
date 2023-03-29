@@ -30,7 +30,9 @@ describe('list creation with []', () => {
   test('literals of different types', () => {
     const code: string = '[1, true, 3];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int or its subset, got bool.')
+      expect(error.explain()).toMatch(
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "bool * int".'
+      )
     })
   })
 
@@ -44,7 +46,9 @@ describe('list creation with []', () => {
   test('nested lists of different type', () => {
     const code: string = '[[1], ["hello"], [3]];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int list or its subset, got string list.')
+      expect(error.explain()).toMatch(
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "string list * int list list".'
+      )
     })
   })
 
@@ -65,14 +69,16 @@ describe('list creation with []', () => {
   test('free list fails with int list elem of lesser nesting', () => {
     const code: string = '[[[]], [1]];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected 'a list list or its subset, got int list.")
+      expect(error.explain()).toMatch(
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "\'a list list * int list list".'
+      )
     })
   })
 
   test('non-free list fails with free list elem of larger nesting', () => {
     const code: string = '[[], [1], [[]]];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected int list or its subset, got 'a list list.")
+      expect(error.explain()).toMatch("Functions of type \"'a * 'a list -> 'a list\" cannot take in an argument of type \"int list * 'a list list list\".")
     })
   })
 })
@@ -183,9 +189,7 @@ describe('list append with @', () => {
   test('append list of different types', () => {
     const code: string = '[1]@[2]@[true];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch(
-        'Expected int list on right hand side of @, got bool list.'
-      )
+      expect(error.explain()).toMatch('Expected int list on right hand side of @, got bool list.')
     })
   })
 

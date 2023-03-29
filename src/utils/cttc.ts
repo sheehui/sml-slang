@@ -1,6 +1,10 @@
 import * as es from 'estree'
 
-import { CompileTimeSourceError } from '../errors/compileTimeSourceError'
+import {
+  CompileTimeSourceError,
+  FunctionTypeError,
+  ReturnTypeError
+} from '../errors/compileTimeSourceError'
 import { ErrorSeverity, ErrorType, FreeType, SmlType, TypedValue, Value } from '../types'
 
 let typeEnv: TypeEnv = {
@@ -82,7 +86,7 @@ export const extendTypeEnv = (vars: string[], types: SmlType[]): TypeEnv => {
   return typeEnv
 }
 
-export const addToFrame = (vars: string, type: SmlType) => {
+export const addToTypeFrame = (vars: string, type: SmlType) => {
   typeEnv.head[vars] = type
 }
 
@@ -145,7 +149,7 @@ export interface TypeSchemeEnv {
   head: TypeSchemeFrame
 }
 
-interface FunctionType {
+export interface FunctionType {
   args: Array<SmlType>
   return: SmlType
 }
@@ -154,19 +158,39 @@ export interface TypeSchemeFrame {
   [name: string]: FunctionType | Array<FunctionType>
 }
 
-export const initTypeSchemeEnv = () => {
+export const resetSchemeEnv = () => {
   typeSchemeEnv = {
     head: PRIM_TYPE_SCHEME,
     tail: null
   }
 }
 
+export const addToSchemeFrame = (vars: string, type: FunctionType | Array<FunctionType>) => {
+  typeSchemeEnv.head[vars] = type
+}
+
+export const restoreSchemeEnv = (env: TypeSchemeEnv) => {
+  typeSchemeEnv = env
+}
+
+const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType> => {
+  let env: TypeSchemeEnv | null = typeSchemeEnv
+  while (env) {
+    const frame: TypeSchemeFrame = env.head
+    if (frame.hasOwnProperty(vars)) {
+      return frame[vars]
+    }
+    env = env.tail
+  }
+  throw Error(`Unbound variable ${vars}`)
+}
+
 /**
  * Type Checking Support
  */
 
-export const typeSchemeCheck = (node: es.Node, name: string, args: Array<any>, ret: any) => {
-  let expectedTypes: FunctionType | Array<FunctionType> = findFunctionTypeInScheme(name)
+export const typeSchemeCheck = (name: string, args: Array<any>, ret: any) => {
+  let expectedTypes: FunctionType | Array<FunctionType> = findSchemeInEnv(name)
   let found = undefined
 
   if (!Array.isArray(expectedTypes)) {
@@ -183,7 +207,7 @@ export const typeSchemeCheck = (node: es.Node, name: string, args: Array<any>, r
       break
     } else if (i === expectedTypes.length - 1) {
       // no more possible scheme to match
-      throw new TypeError(node, expectedTypes[0], args)
+      throw new FunctionTypeError(expectedTypes[0], currType)
     }
   }
 
@@ -233,50 +257,6 @@ export const unifyReturnType = (annotation: SmlType, actual: SmlType) => {
   return type
 }
 
-export class TypeError extends CompileTimeSourceError {
-  public type = ErrorType.COMPILE_TIME
-  public severity = ErrorSeverity.ERROR
-  public location: es.SourceLocation
-
-  constructor(node: es.Node | undefined, public expected: FunctionType, public got: any) {
-    super(node)
-    this.expected = expected
-    this.got = got
-  }
-
-  public explain() {
-    return `Functions of type "${functionTypeToString(
-      this.expected
-    )}" cannot take in an argument of type "${argToString(this.got)}".`
-  }
-
-  public elaborate() {
-    return this.explain()
-  }
-}
-
-export class ReturnTypeError extends CompileTimeSourceError {
-  public type = ErrorType.COMPILE_TIME
-  public severity = ErrorSeverity.ERROR
-  public location: es.SourceLocation
-
-  constructor(public expected: SmlType, public got: SmlType) {
-    super(undefined)
-    this.expected = expected
-    this.got = got
-  }
-
-  public explain() {
-    return `The annotated type "${smlTypeToString(
-      this.expected
-    )}" does not match expression's type "${smlTypeToString(this.got)}".`
-  }
-
-  public elaborate() {
-    return this.explain()
-  }
-}
-
 const isNumber = (v: Value) => typeOf(v) === 'number'
 const isString = (v: Value) => typeOf(v) === 'string'
 const isBool = (v: Value) => typeOf(v) === 'boolean'
@@ -303,29 +283,8 @@ const typeOf = (v: Value) => {
   }
 }
 
-const isTypeEqual = (left: SmlType, right: SmlType): boolean => {
-  if ((isTypedList(left) && isTypedList(right)) || (isTypedTuple(left) && isTypedTuple(right))) {
-    return right.toString() === left.toString()
-  } else {
-    return left === right
-  }
-}
-
-const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
-  if (typeof left === 'string' && typeof right === 'string') {
-    return left === right
-  } else if (Array.isArray(left) && Array.isArray(right)) {
-    if (left.length !== right.length) {
-      return false
-    }
-    for (let i = 0; i < left.length; i++) {
-      if (!typeArrEqual(left[i], right[i])) {
-        return false
-      }
-    }
-    return true
-  }
-  return false
+const isStrictEqual = (left: SmlType, right: SmlType): boolean => {
+  return left.toString() === right.toString()
 }
 
 const getListDepth = (v: SmlType) => {
@@ -343,94 +302,6 @@ const getListDepth = (v: SmlType) => {
   throw Error('cannot get list depth of non-list type')
 }
 
-const functionTypeToString = (type: any): string => {
-  let result = ''
-
-  for (let i = 0; i < type.args.length; i++) {
-    const element = type.args[i]
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
-  }
-
-  result += ' -> '
-
-  result += smlTypeToString(type.return) // abit sus
-
-  return result
-}
-
-const argToString = (type: any): string => {
-  let result = ''
-
-  for (let i = 0; i < type.length; i++) {
-    const element = type[i].type
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
-  }
-
-  return result
-}
-
-const smlTypeToString = (type: SmlType): string => {
-  const isTypeArr = Array.isArray(type)
-  if (isTypeArr && type[type.length - 1] == 'list') {
-    let str = ''
-
-    type.forEach((element: SmlType | Array<SmlType>) => {
-      if (Array.isArray(element)) {
-        str += ' ' + smlTypeToString(element)
-      } else {
-        str += ' ' + element
-      }
-    })
-
-    return str.trim()
-  } else if (isTypeArr && type[type.length - 1] == 'tuple') {
-    let str = '('
-
-    for (let i = 0; i < type.length - 1; i++) {
-      const element = type[i]
-      if (i !== 0) {
-        str += ' * '
-      }
-      if (Array.isArray(element)) {
-        str += smlTypeToString(element)
-      } else {
-        str += element
-      }
-    }
-    str += ')'
-
-    return str
-  } else if (isTypeArr && type[type.length - 1] == 'fun') {
-    const paramsType = Array.isArray(type[0]) ? smlTypeToString(type[0]) : type[0]
-    const retType = Array.isArray(type[1]) ? smlTypeToString(type[1]) : type[1]
-
-    return `${paramsType} -> ${retType}`
-  } else {
-    return type.toString()
-  }
-}
-
-// const getTypeString = (val: TypedValue | string): string => {
-//   if (typeof val === 'string') {
-//     return val
-//   } else if (Array.isArray(val.type)) {
-//     if (isTypedList(val) || isTypedTuple(val)) {
-//       return smlTypeToString(val.type)
-//     }
-//     throw Error('Unable to get type of non-list/tuple array for SmlType.type')
-//   } else {
-//     return val.type
-//   }
-// }
-
 export const getTypeFromVal = (val: any): SmlType => {
   if (isBool(val)) {
     return 'bool'
@@ -443,18 +314,6 @@ export const getTypeFromVal = (val: any): SmlType => {
   } else {
     throw Error('Unexpected literal value to type')
   }
-}
-
-const findFunctionTypeInScheme = (vars: string): FunctionType | Array<FunctionType> => {
-  let env: TypeSchemeEnv | null = typeSchemeEnv
-  while (env) {
-    const frame: TypeSchemeFrame = env.head
-    if (frame.hasOwnProperty(vars)) {
-      return frame[vars]
-    }
-    env = env.tail
-  }
-  throw Error(`Unbound variable ${vars}`)
 }
 
 const constructFuncType = (args: Array<any>, ret: any): FunctionType => {
@@ -485,7 +344,7 @@ const constrainListType = (scheme: SmlType, given: SmlType) => {
   }
 
   if (!isFreeList(scheme) && !isFreeList(given)) {
-    return isTypeEqual(scheme, given) ? scheme : undefined
+    return isStrictEqual(scheme, given) ? scheme : undefined
   }
 
   return undefined
@@ -541,5 +400,39 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) : any => {
     return result 
   }
 
-  return typeArrEqual(scheme, given) ? scheme : undefined
+  return isStrictEqual(scheme, given) ? scheme : undefined
+}
+
+export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType => {
+  const scheme: FunctionType = {
+    args: ["'a", ["'a", 'list']],
+    return: ["'a", 'list']
+  }
+  if (constrainType(currType, newType)) {
+    return isFreeList(currType)
+      ? isFreeList(newType)
+        ? getListDepth(currType) >= getListDepth(newType)
+          ? currType
+          : newType
+        : newType
+      : currType
+  } else {
+    if (Array.isArray(currType)) {
+      currType.push('list')
+    }
+    throw new FunctionTypeError(scheme, {args: [newType, currType], return: newTypeVar()})
+  }
+}
+
+export const getDeclaredListType = (first: SmlType | undefined): SmlType => {
+  if (first === undefined) {
+    return ["'a", 'list']
+  } else {
+    const typeArr = isTypedList(first) ? first : [first]
+    if (!Array.isArray(typeArr)) {
+      throw Error('Cannot push to a non array type.')
+    }
+    typeArr.push('list')
+    return typeArr
+  }
 }

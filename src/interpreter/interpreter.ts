@@ -116,15 +116,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     let type = undefined
 
     if (tag === 'list_lit') {
-      for (let i = 0; i < node.elements.length; i++) {
+      for (let i = node.elements.length - 1; i >= 0; i--) { // right assoc
         const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
         elems.push(elem)
-        if (type == undefined) {
+        if (!type) {
           type = elem.type 
         }
-        type = rttc.updateListLitType(type, elem.type, node)
+        type = cttc.unifyListLitType(type, elem.type)
       }
-      type = rttc.getListLitType(type) 
+      type = cttc.getDeclaredListType(type)
+      elems.reverse()
     } else if (tag === 'tuple_lit') {
       type = []
       for (let i = 0; i < node.elements.length; i++) {
@@ -164,7 +165,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const initEnv = cttc.getTypeEnv()
     cttc.extendTypeEnv([], []) 
     for (let i = 0; i < node.params.length; i++) {
-      cttc.addToFrame((node.params[i] as any).name, cttc.newTypeVar()) // some unassigned type
+      cttc.addToTypeFrame((node.params[i] as any).name, cttc.newTypeVar()) // some unassigned type
+
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
 
       params.push(param)
@@ -196,7 +198,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     if (!valType) {
       valType = cttc.findTypeInEnv(node.name) 
     } else {
-      cttc.addToFrame(node.name, valType)
+      cttc.addToTypeFrame(node.name, valType)
     }
 
     return {
@@ -238,7 +240,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
-    const type = cttc.typeSchemeCheck(node, node.operator, [arg], undefined)
+    const type = cttc.typeSchemeCheck(node.operator, [arg], undefined)
 
     return {
       tag: 'unop',
@@ -252,7 +254,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
     const scnd = yield* evaluators[node.left.type](node.left, context)
-    const type = cttc.typeSchemeCheck(node, node.operator, [scnd, frst], undefined)
+    const type = cttc.typeSchemeCheck(node.operator, [scnd, frst], undefined)
 
     return {
       tag: 'binop',
@@ -328,7 +330,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         localArity = locals.arity
       }
 
-      cttc.addToFrame((decl.id as any).name, cttc.newTypeVar()) // assign initial free type
+      cttc.addToTypeFrame((decl.id as any).name, cttc.newTypeVar()) // assign initial free type
       const id = yield* evaluators[decl.id.type](decl.id, context)
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
@@ -338,7 +340,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       }
 
       const type = cttc.unifyReturnType(id.type, expr.type)
-      cttc.addToFrame(id.sym, type) 
+      cttc.addToTypeFrame(id.sym, type) 
       
       ids.push(id)
       exprs.push(expr)
@@ -564,8 +566,8 @@ const microcode: { [tag: string]: Function } = {
   lam: (cmd: { params: any[]; body: es.BlockStatement; id: any }) => {
     A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E })
   },
-  list_lit: (cmd: { elems: any[]; node: es.ArrayExpression }) => {
-    A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node })
+  list_lit: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
+    A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node, type: cmd.type })
     cmd.elems.forEach(x => {
       A.push(x)
     })
@@ -641,7 +643,7 @@ const microcode: { [tag: string]: Function } = {
     }
     E.head[cmd.id.sym] = val
   },
-  list_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
+  list_lit_i: (cmd: { len: number; node: es.ArrayExpression; type: SmlType }) => {
     const list = []
     let type = undefined
 
@@ -658,6 +660,13 @@ const microcode: { [tag: string]: Function } = {
     }
 
     S.push(rttc.getDeclaredTypedList(type, list))
+    // const list = []
+    // for (let i = 0; i < cmd.len; i++) {
+    //   const elem: TypedValue = S.pop()
+    //   list.push(elem.value)
+    // }
+
+    // S.push({ type: cmd.type, value: list })
   },
   list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     const left = S.pop()
@@ -733,8 +742,8 @@ export function* evaluate(node: es.Node, context: Context): any {
   while (i < step_limit) {
     if (A.size() === 0) break
     const cmd = A.pop()
-    console.log('\n=====instruction====')
-    console.log(cmd)
+    // console.log('\n=====instruction====')
+    // console.log(cmd)
     // console.log("\n=====agenda====")
     // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
