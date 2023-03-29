@@ -1,11 +1,12 @@
 import * as es from 'estree'
 
 import { CompileTimeSourceError } from '../errors/compileTimeSourceError'
-import { ErrorSeverity, ErrorType, SmlType, TypedValue, Value } from '../types'
+import { ErrorSeverity, ErrorType, FreeType, SmlType, TypedValue, Value } from '../types'
 
 let typeEnv: TypeEnv = {
   head: {},
-  tail: null
+  tail: null,
+  index: 0,
 }
 
 const PRIM_TYPE_SCHEME: TypeSchemeFrame = {
@@ -48,7 +49,8 @@ let typeSchemeEnv: TypeSchemeEnv = {
 
 export interface TypeEnv {
   tail: TypeEnv | null
-  head: TypeFrame
+  head: TypeFrame,
+  index: number
 }
 
 export interface TypeFrame {
@@ -58,7 +60,8 @@ export interface TypeFrame {
 export const resetTypeEnv = () => {
   typeEnv = {
     head: {},
-    tail: null
+    tail: null,
+    index: 0
   }
 }
 
@@ -73,7 +76,8 @@ export const extendTypeEnv = (vars: string[], types: SmlType[]): TypeEnv => {
   }
   typeEnv = {
     tail: typeEnv,
-    head: newFrame
+    head: newFrame,
+    index: typeEnv.index
   }
   return typeEnv
 }
@@ -86,14 +90,23 @@ export const restoreTypeEnv = (env: TypeEnv) => {
   typeEnv = env
 }
 
+export const newTypeVar = () : FreeType => {
+  const newTypeVar : FreeType = `T${typeEnv.index}`
+  typeEnv.index++ 
+  return newTypeVar
+}
+
 export const findTypeInEnv = (vars: string): SmlType => {
   let env: TypeEnv | null = typeEnv
+  // let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
   while (env) {
     const frame: TypeFrame = env.head
+    // const schemeFrame: TypeSchemeFrame = schemeEnv.head 
     if (frame.hasOwnProperty(vars)) {
       return frame[vars]
     }
     env = env.tail
+    // schemeEnv = schemeEnv.tail
   }
   throw Error(`Unbound variable ${vars}`)
 }
@@ -108,6 +121,19 @@ export const isInTypeEnv = (vars: string): boolean => {
     env = env.tail
   }
   return false
+}
+
+const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
+  let env: TypeEnv | null = typeEnv
+  while (env) {
+    const frame: TypeFrame = env.head
+    for (const key in frame) {
+      if (frame[key] === toReplace) {
+        frame[key] = replacement
+      }
+    }
+    env = env.tail
+  }
 }
 
 /**
@@ -263,7 +289,9 @@ const isFreeLiteral = (v: SmlType) => v === "'a"
 const isTypedList = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'list'
 const isFreeList = (v: SmlType) => isTypedList(v) && v[0] === "'a"
 const isTypedTuple = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'tuple'
+const isTypedFun = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'fun'
 const isListOrTuple = (v: SmlType) => isTypedList(v) || isTypedTuple(v)
+const isTypeVar = (v: SmlType) => typeOf(v) === 'string' && v[0] === "T"
 
 const typeOf = (v: Value) => {
   if (v === null) {
@@ -286,7 +314,7 @@ const isTypeEqual = (left: SmlType, right: SmlType): boolean => {
 const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
   if (typeof left === 'string' && typeof right === 'string') {
     return left === right
-  } else if (typeof left !== 'string' && typeof right !== 'string') {
+  } else if (Array.isArray(left) && Array.isArray(right)) {
     if (left.length !== right.length) {
       return false
     }
@@ -303,7 +331,7 @@ const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
 const getListDepth = (v: SmlType) => {
   if (isTypedList(v)) {
     let depth = 0
-    for (let i = v.length - 1; i >= 0; i--) {
+    for (let i = (v as Array<SmlType>).length - 1; i >= 0; i--) {
       if (v[i] === 'list') {
         depth++
       } else {
@@ -475,13 +503,17 @@ const constrainLiteralType = (scheme: SmlType, given: SmlType) => {
   return scheme
 }
 
-const constrainType = (scheme: SmlType, given: SmlType | undefined) => {
+const constrainType = (scheme: SmlType, given: SmlType | undefined) : any => {
   if (!given) {
     return scheme
   }
 
-  if (scheme === 'free') {
-    return given
+  if (isTypeVar(given) || isTypeVar(scheme)) {
+    const toReplace = isTypeVar(given) ? given : scheme 
+    const replacement = isTypeVar(given) ? scheme : given
+
+    replaceTypeVar(toReplace as FreeType, replacement)
+    return replacement
   }
 
   if (isTypedList(scheme) && isTypedList(given)) {
@@ -494,6 +526,19 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) => {
 
   if (isFreeLiteral(scheme) || isFreeLiteral(given)) {
     return constrainLiteralType(scheme, given)
+  }
+
+  if (isTypedFun(scheme) && isTypedFun(given)) {
+    const result = []
+    for (let i = 0; i < scheme.length - 1; i++) {
+      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType) 
+      if (!constrained) {
+        return constrained 
+      }
+      result.push(constrained)
+    }
+    result.push('fun')
+    return result 
   }
 
   return typeArrEqual(scheme, given) ? scheme : undefined

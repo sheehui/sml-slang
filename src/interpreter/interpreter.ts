@@ -159,22 +159,22 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
     const params = []
-    let paramsTypes = [] 
+    let paramsTypes : SmlType = [] 
     // extend env here to eval func block
     const initEnv = cttc.getTypeEnv()
     cttc.extendTypeEnv([], []) 
     for (let i = 0; i < node.params.length; i++) {
-      cttc.addToFrame((node.params[i] as any).name, "'a") // some unassigned type
-
+      cttc.addToFrame((node.params[i] as any).name, cttc.newTypeVar()) // some unassigned type
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
-      params.push(param)
-      paramsTypes.push(param.type)
 
-      cttc.addToFrame(param.sym, param.type)
+      params.push(param)
+    }
+    const body = yield* evaluators[node.body.type](node.body, context) 
+    for (let i = 0; i < params.length; i++) {
+      paramsTypes.push(cttc.findTypeInEnv(params[i].sym))
     }
     paramsTypes.push('tuple')
     paramsTypes = paramsTypes.length <= 2 ? paramsTypes[0] : paramsTypes
-    const body = yield* evaluators[node.body.type](node.body, context) 
 
     // finish eval func block so restore the env
     cttc.restoreTypeEnv(initEnv)
@@ -208,7 +208,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   CallExpression: function* (node: es.CallExpression, context: Context) {
     const fun = yield* evaluators[node.callee.type](node.callee, context)
-
     const paramTypes = fun.type[0] 
     let argTypes = []
     const args = [] 
@@ -329,7 +328,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         localArity = locals.arity
       }
 
-      cttc.addToFrame((decl.id as any).name, 'free') // assign initial free type
+      cttc.addToFrame((decl.id as any).name, cttc.newTypeVar()) // assign initial free type
       const id = yield* evaluators[decl.id.type](decl.id, context)
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
