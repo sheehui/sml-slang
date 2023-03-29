@@ -251,29 +251,8 @@ const typeOf = (v: Value) => {
   }
 }
 
-const isTypeEqual = (left: SmlType, right: SmlType): boolean => {
-  if ((isTypedList(left) && isTypedList(right)) || (isTypedTuple(left) && isTypedTuple(right))) {
-    return right.toString() === left.toString()
-  } else {
-    return left === right
-  }
-}
-
-const typeArrEqual = (left: SmlType, right: SmlType): boolean => {
-  if (typeof left === 'string' && typeof right === 'string') {
-    return left === right
-  } else if (typeof left !== 'string' && typeof right !== 'string') {
-    if (left.length !== right.length) {
-      return false
-    }
-    for (let i = 0; i < left.length; i++) {
-      if (!typeArrEqual(left[i], right[i])) {
-        return false
-      }
-    }
-    return true
-  }
-  return false
+const isStrictEqual = (left: SmlType, right: SmlType): boolean => {
+  return left.toString() === right.toString()
 }
 
 const getListDepth = (v: SmlType) => {
@@ -333,7 +312,7 @@ const constrainListType = (scheme: SmlType, given: SmlType) => {
   }
 
   if (!isFreeList(scheme) && !isFreeList(given)) {
-    return isTypeEqual(scheme, given) ? scheme : undefined
+    return isStrictEqual(scheme, given) ? scheme : undefined
   }
 
   return undefined
@@ -372,5 +351,5 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) => {
     return constrainLiteralType(scheme, given)
   }
 
-  return typeArrEqual(scheme, given) ? scheme : undefined
+  return isStrictEqual(scheme, given) ? scheme : undefined
 }
