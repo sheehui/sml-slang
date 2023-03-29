@@ -27,7 +27,7 @@ export class FunctionTypeError extends CompileTimeSourceError {
   public severity = ErrorSeverity.ERROR
   public location: es.SourceLocation
 
-  constructor(public expected: FunctionType, public got: any) {
+  constructor(public expected: FunctionType, public got: FunctionType) {
     super()
     this.expected = expected
     this.got = got
@@ -66,7 +66,7 @@ export class ReturnTypeError extends CompileTimeSourceError {
   }
 }
 
-const functionTypeToString = (type: any): string => {
+const functionTypeToString = (type: FunctionType): string => {
   let result = ''
 
   for (let i = 0; i < type.args.length; i++) {
@@ -85,11 +85,11 @@ const functionTypeToString = (type: any): string => {
   return result
 }
 
-const argToString = (type: any): string => {
+const argToString = (type: FunctionType): string => {
   let result = ''
 
-  for (let i = 0; i < type.length; i++) {
-    const element = type[i].type
+  for (let i = 0; i < type.args.length; i++) {
+    const element = type.args[i]
     if (i !== 0) {
       result += ' * '
     }

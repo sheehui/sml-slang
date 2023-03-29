@@ -1,6 +1,10 @@
 import * as es from 'estree'
 
-import { CompileTimeSourceError, FunctionTypeError, ReturnTypeError } from '../errors/compileTimeSourceError'
+import {
+  CompileTimeSourceError,
+  FunctionTypeError,
+  ReturnTypeError
+} from '../errors/compileTimeSourceError'
 import { ErrorSeverity, ErrorType, SmlType, Value } from '../types'
 
 let typeEnv: TypeEnv = {
@@ -177,7 +181,7 @@ export const typeSchemeCheck = (name: string, args: Array<any>, ret: any) => {
       break
     } else if (i === expectedTypes.length - 1) {
       // no more possible scheme to match
-      throw new FunctionTypeError(expectedTypes[0], args)
+      throw new FunctionTypeError(expectedTypes[0], currType)
     }
   }
 
@@ -352,4 +356,38 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) => {
   }
 
   return isStrictEqual(scheme, given) ? scheme : undefined
+}
+
+export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType => {
+  const scheme: FunctionType = {
+    args: ["'a", ["'a", 'list']],
+    return: ["'a", 'list']
+  }
+  if (constrainType(currType, newType)) {
+    return isFreeList(currType)
+      ? isFreeList(newType)
+        ? getListDepth(currType) >= getListDepth(newType)
+          ? currType
+          : newType
+        : newType
+      : currType
+  } else {
+    if (Array.isArray(newType)) {
+      newType.push('list')
+    }
+    throw new FunctionTypeError(scheme, {args: [currType, newType], return: 'free'})
+  }
+}
+
+export const getDeclaredListType = (first: SmlType | undefined): SmlType => {
+  if (first === undefined) {
+    return ["'a", 'list']
+  } else {
+    const typeArr = isTypedList(first) ? first : [first]
+    if (!Array.isArray(typeArr)) {
+      throw Error('Cannot push to a non array type.')
+    }
+    typeArr.push('list')
+    return typeArr
+  }
 }

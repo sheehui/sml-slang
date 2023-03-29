@@ -119,12 +119,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       for (let i = 0; i < node.elements.length; i++) {
         const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
         elems.push(elem)
-        if (type == undefined) {
+        if (!type) {
           type = elem.type 
         }
-        type = rttc.updateListLitType(type, elem.type, node)
+        type = cttc.unifyListLitType(type, elem.type)
       }
-      type = rttc.getListLitType(type) 
+      type = cttc.getDeclaredListType(type)
     } else if (tag === 'tuple_lit') {
       type = []
       for (let i = 0; i < node.elements.length; i++) {
@@ -565,8 +565,8 @@ const microcode: { [tag: string]: Function } = {
   lam: (cmd: { params: any[]; body: es.BlockStatement; id: any }) => {
     A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E })
   },
-  list_lit: (cmd: { elems: any[]; node: es.ArrayExpression }) => {
-    A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node })
+  list_lit: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
+    A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node, type: cmd.type })
     cmd.elems.forEach(x => {
       A.push(x)
     })
@@ -642,7 +642,7 @@ const microcode: { [tag: string]: Function } = {
     }
     E.head[cmd.id.sym] = val
   },
-  list_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
+  list_lit_i: (cmd: { len: number; node: es.ArrayExpression; type: SmlType }) => {
     const list = []
     let type = undefined
 
@@ -659,6 +659,13 @@ const microcode: { [tag: string]: Function } = {
     }
 
     S.push(rttc.getDeclaredTypedList(type, list))
+    // const list = []
+    // for (let i = 0; i < cmd.len; i++) {
+    //   const elem: TypedValue = S.pop()
+    //   list.push(elem.value)
+    // }
+
+    // S.push({ type: cmd.type, value: list })
   },
   list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     const left = S.pop()
@@ -734,8 +741,8 @@ export function* evaluate(node: es.Node, context: Context): any {
   while (i < step_limit) {
     if (A.size() === 0) break
     const cmd = A.pop()
-    console.log('\n=====instruction====')
-    console.log(cmd)
+    // console.log('\n=====instruction====')
+    // console.log(cmd)
     // console.log("\n=====agenda====")
     // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
