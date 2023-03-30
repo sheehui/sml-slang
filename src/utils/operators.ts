@@ -180,27 +180,3 @@ export function evaluateBinaryExpression(operator: BinaryOperator | string, left
       return Error('Invalid binary operator ' + operator)
   }
 }
-
-// export const setProp = (obj: any, prop: any, value: any, line: number, column: number) => {
-//   const dummy = locationDummyNode(line, column)
-//   const error = rttc.checkMemberAccess(dummy, obj, prop)
-//   if (error === undefined) {
-//     return (obj[prop] = value)
-//   } else {
-//     throw error
-//   }
-// }
-
-// export const getProp = (obj: any, prop: any, line: number, column: number) => {
-//   const dummy = locationDummyNode(line, column)
-//   const error = rttc.checkMemberAccess(dummy, obj, prop)
-//   if (error === undefined) {
-//     if (obj[prop] !== undefined && !obj.hasOwnProperty(prop)) {
-//       throw new GetInheritedPropertyError(dummy, obj, prop)
-//     } else {
-//       return obj[prop]
-//     }
-//   } else {
-//     throw error
-//   }
-// }
