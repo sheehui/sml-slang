@@ -432,7 +432,7 @@ export const getDeclaredListType = (first: SmlType | undefined): SmlType => {
     if (!Array.isArray(typeArr)) {
       throw Error('Cannot push to a non array type.')
     }
-    typeArr.push('list')
-    return typeArr
+    
+    return typeArr.concat(['list'])
   }
 }

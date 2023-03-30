@@ -645,28 +645,12 @@ const microcode: { [tag: string]: Function } = {
   },
   list_lit_i: (cmd: { len: number; node: es.ArrayExpression; type: SmlType }) => {
     const list = []
-    let type = undefined
-
     for (let i = 0; i < cmd.len; i++) {
       const elem: TypedValue = S.pop()
-
-      if (type == undefined) {
-        type = elem
-      }
-
-      type = rttc.updateListType(type, elem, cmd.node)
-
       list.push(elem.value)
     }
 
-    S.push(rttc.getDeclaredTypedList(type, list))
-    // const list = []
-    // for (let i = 0; i < cmd.len; i++) {
-    //   const elem: TypedValue = S.pop()
-    //   list.push(elem.value)
-    // }
-
-    // S.push({ type: cmd.type, value: list })
+    S.push({ type: cmd.type, value: list })
   },
   list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
     const left = S.pop()
@@ -764,5 +748,5 @@ export function* evaluate(node: es.Node, context: Context): any {
   const r = S.pop()
   console.log(r)
   console.log(cttc.getTypeEnv().head)
-  return r.value
+  return r
 }
