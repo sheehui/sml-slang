@@ -112,7 +112,7 @@ export const newTypeVar = () : FreeType => {
   return newTypeVar
 }
 
-export const findTypeInEnv = (vars: string): SmlType | FunctionType => {
+export const findTypeInEnv = (vars: string): SmlType => {
   let env: TypeEnv | null = typeEnv
   let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
   while (env && schemeEnv) {
@@ -122,7 +122,10 @@ export const findTypeInEnv = (vars: string): SmlType | FunctionType => {
       return frame[vars]
     }
     if (schemeFrame.hasOwnProperty(vars)) {
-      return schemeFrame[vars] as FunctionType
+      const scheme = schemeFrame[vars] as FunctionType
+      const params = scheme.args.length === 1 ? scheme.args[0] : scheme.args.concat['tuple']
+      return [params, scheme.return, 'fun']
+      // return schemeFrame[vars] as FunctionType
     }
     env = env.tail
     schemeEnv = schemeEnv.tail

@@ -181,6 +181,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     for (let i = 0; i < params.length; i++) {
       paramsTypes.push(cttc.findTypeInEnv(params[i].sym))
+      // if (i === params.length - 1 && i > 0) {
+      //   paramsTypes.push('tuple')
+      // }
     }
 
     // finish eval func block so restore the env
@@ -362,7 +365,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         cttc.restoreTypeEnv(initEnv)
         cttc.restoreSchemeEnv(initSchemeEnv) 
       }
-
+      // console.log(id.type, "IDTYPE")
+      // console.log(expr.type, "EXPRTYPE")
       let type = undefined 
       if (id.type.args && expr.type.args) { // both are functions 
         type = cttc.unifyScheme(id.type, expr.type)
