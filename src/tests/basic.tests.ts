@@ -836,7 +836,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'The annotated type "int -> int" does not match expression\'s type "int -> bool".'
+        'Functions of type \"int -> int\" cannot take in an argument of type \"int\".'
       )
     })
   })
@@ -846,7 +846,7 @@ describe('type annotations', () => {
       fun test (x : int) : int = x + 6; test(true);
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int as argument to function, got bool.')
+      expect(error.explain()).toMatch("The annotated type \"int\" does not match expression's type \"bool\".")
     })
   })
 
@@ -867,7 +867,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'The annotated type "int -> bool" does not match expression\'s type "bool -> int".'
+        "Functions of type \"int -> bool\" cannot take in an argument of type \"bool\"."
       )
     })
   })
@@ -878,7 +878,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'Expected (int * int * int) as argument to function, got (int * int).'
+        "The annotated type \"(int * int * int)\" does not match expression's type \"(int * int)\"."
       )
     })
   })

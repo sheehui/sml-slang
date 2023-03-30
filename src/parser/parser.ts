@@ -470,13 +470,13 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   }
   visitFunDec(ctx: FunDecContext): es.VariableDeclarator[] {
     const params: es.Pattern[] = new PatternGenerator().visit(ctx._params)
-    const retType: SmlType = ctx._retType ? ctx._retType.accept(new TypeGenerator()) : "'a"
+    const retType: SmlType | undefined = ctx._retType ? ctx._retType.accept(new TypeGenerator()) : undefined
 
     // get type of function
     let paramsType: SmlType | SmlType[] = []
     for (let i = 0; i < params.length; i++) {
       const curr: es.Pattern = params[i]
-      paramsType.push(curr['valType'] ? curr['valType'] : "'a")
+      paramsType.push(curr['valType'])
     }
     if (paramsType.length === 1) {
       paramsType = paramsType[0]
@@ -486,7 +486,9 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
       type: 'Identifier',
       name: ctx._identifier.text!
     } as es.Identifier
-    identifier['valType'] = [paramsType, retType, 'fun']
+    identifier['valType'] = (retType || paramsType)
+      ? [paramsType, retType, 'fun']
+      : undefined 
 
     return [
       {

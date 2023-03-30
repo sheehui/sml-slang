@@ -92,7 +92,14 @@ export const extendTypeEnv = (vars: string[], types: SmlType[]): TypeEnv => {
 }
 
 export const addToTypeFrame = (vars: string, type: SmlType) => {
-  typeEnv.head[vars] = type
+  if (isTypedFun(type)) {
+    // add to type scheme env, remove key from typeEnv 
+    delete typeEnv[vars]
+    return typeSchemeEnv[vars] = smlToFuncType(type)
+  }
+  // remove key from typeSchemeEnv 
+  delete typeSchemeEnv[vars] 
+  return typeEnv.head[vars] = type
 }
 
 export const restoreTypeEnv = (env: TypeEnv) => {
@@ -105,17 +112,20 @@ export const newTypeVar = () : FreeType => {
   return newTypeVar
 }
 
-export const findTypeInEnv = (vars: string): SmlType => {
+export const findTypeInEnv = (vars: string): SmlType | FunctionType => {
   let env: TypeEnv | null = typeEnv
-  // let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
-  while (env) {
+  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
+  while (env && schemeEnv) {
     const frame: TypeFrame = env.head
-    // const schemeFrame: TypeSchemeFrame = schemeEnv.head 
+    const schemeFrame: TypeSchemeFrame = schemeEnv.head 
     if (frame.hasOwnProperty(vars)) {
       return frame[vars]
     }
+    if (schemeFrame.hasOwnProperty(vars)) {
+      return schemeFrame[vars] as FunctionType
+    }
     env = env.tail
-    // schemeEnv = schemeEnv.tail
+    schemeEnv = schemeEnv.tail
   }
   throw Error(`Unbound variable ${vars}`)
 }
@@ -134,13 +144,29 @@ export const isInTypeEnv = (vars: string): boolean => {
 
 const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
   let env: TypeEnv | null = typeEnv
-  while (env) {
+  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv 
+  while (env && schemeEnv) {
     const frame: TypeFrame = env.head
+    const schemeFrame: TypeSchemeFrame = schemeEnv.head 
     for (const key in frame) {
       if (frame[key] === toReplace) {
         frame[key] = replacement
       }
     }
+    for (const key in schemeFrame) {
+      const scheme = schemeFrame[key]
+      if (Array.isArray(scheme)) {
+        for (let i = 0; i < scheme.length; i++) {
+          const curr = scheme[i] 
+          curr.args = curr.args.map(x => x === toReplace ? replacement : x) 
+          curr.return = curr.return === toReplace ? replacement : curr.return 
+        }
+      } else {
+        scheme.args = scheme.args.map(x => x === toReplace ? replacement : x) 
+        scheme.return = scheme.return === toReplace ? replacement : scheme.return 
+      }
+    }
+    schemeEnv = schemeEnv.tail 
     env = env.tail
   }
 }
@@ -170,7 +196,31 @@ export const resetSchemeEnv = () => {
   }
 }
 
+export const getSchemeEnv = () : TypeSchemeEnv => {
+  return typeSchemeEnv 
+}
+
+export const newSchemeVar = () : FunctionType => {
+  return {
+    args: [newTypeVar()], 
+    return: newTypeVar() 
+  }
+}
+
+export const extendSchemeEnv = (vars: string[], schemes: FunctionType[]): TypeSchemeEnv => {
+  const newFrame = {}
+  for (let i = 0; i < vars.length; i++) {
+    newFrame[vars[i]] = schemes[i]
+  }
+  typeSchemeEnv = {
+    tail: typeSchemeEnv,
+    head: newFrame,
+  }
+  return typeSchemeEnv
+}
+
 export const addToSchemeFrame = (vars: string, type: FunctionType | Array<FunctionType>) => {
+  delete typeEnv.head[vars]
   typeSchemeEnv.head[vars] = type
 }
 
@@ -178,7 +228,7 @@ export const restoreSchemeEnv = (env: TypeSchemeEnv) => {
   typeSchemeEnv = env
 }
 
-const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType> => {
+export const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType> => {
   let env: TypeSchemeEnv | null = typeSchemeEnv
   while (env) {
     const frame: TypeSchemeFrame = env.head
@@ -224,9 +274,9 @@ export const typeSchemeCheck = (name: string, args: Array<any>, ret: any) => {
   return found
 }
 
-const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
+export const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
   if (schemeType.args.length !== givenType.args.length) {
-    return undefined
+    return undefined 
   }
 
   const args = []
@@ -236,7 +286,7 @@ const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
     const givenElem = givenType.args[i]
     const substitued = constrainType(schemeElem, givenElem)
     if (substitued === undefined) {
-      return undefined
+      return undefined 
     }
     args.push(substitued)
   }
@@ -244,7 +294,7 @@ const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
   const resultType = constrainType(schemeType.return, givenType.return)
   if (!resultType) {
     // wrong error msg
-    return undefined
+    return undefined 
   }
 
   return {
@@ -275,9 +325,22 @@ const isFreeLiteral = (v: SmlType) => v === "'a"
 const isTypedList = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'list'
 const isFreeList = (v: SmlType) => isTypedList(v) && v[0] === "'a"
 const isTypedTuple = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'tuple'
-const isTypedFun = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'fun'
+export const isTypedFun = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'fun'
 const isListOrTuple = (v: SmlType) => isTypedList(v) || isTypedTuple(v)
 const isTypeVar = (v: SmlType) => typeOf(v) === 'string' && v[0] === "T"
+export const isFuncType = (v: any) => v.args && v.return 
+
+export const smlToFuncType = (v: SmlType) : FunctionType => {
+  v = v as Array<SmlType> // we are sure that v is an array 
+  const smlParams = v[0] 
+  const smlRet : SmlType = v[1] 
+  let args = isTypedTuple(smlParams) ? smlParams.slice(0, -1) : [smlParams]
+  args = (args as Array<SmlType>).map(x => x === undefined ? newTypeVar() : x) 
+  return {
+    args,
+    return: smlRet !== undefined ? smlRet : newTypeVar() 
+  }
+} 
 
 const typeOf = (v: Value) => {
   if (v === null) {
