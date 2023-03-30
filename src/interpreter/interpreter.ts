@@ -94,8 +94,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   Literal: function* (node: es.Literal, _context: Context) {
     return {
       tag: 'lit',
-      val: node.value,
-      type: rttc.getTypeFromVal(node.value)
+      val: node.value === null ? [] : node.value,
+      type: cttc.getTypeFromVal(node.value)
     }
   },
 
@@ -481,8 +481,8 @@ const microcode: { [tag: string]: Function } = {
       A.push({ tag: 'pop_i' })
     }
   },
-  lit: (cmd: { val: any }) => {
-    S.push(rttc.getTypedLiteral(cmd.val))
+  lit: (cmd: { val: any; type: SmlType }) => {
+    S.push({type: cmd.type, value: cmd.val})
   },
   id: (cmd: { sym: string }) => {
     let env: Environment | null = E
@@ -615,17 +615,6 @@ const microcode: { [tag: string]: Function } = {
     const arg = S.pop()
     const value = unaryOp(cmd.sym, arg)
     S.push({ type: cmd.type, value })
-  },
-  unop_check_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
-    const arg = S.pop()
-    // check if type match operator
-    const dummyNode: es.Node = { type: 'Literal', value: null }
-    const typeError = rttc.checkUnaryExpression(dummyNode, cmd.sym, arg)
-    if (typeError) {
-      throw typeError
-    }
-    // push some dummy object containing type onto stack
-    S.push({ type: rttc.operatorToResultType(cmd.sym, arg.type, arg.type), value: null })
   },
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env
