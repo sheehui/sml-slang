@@ -127,14 +127,18 @@ describe('list construction with :: and nil', () => {
   test('RHS is not nil or list', () => {
     const code: string = '4::5;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected list on right hand side of operation, got int.')
+      expect(error.explain()).toMatch(
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "int * int".'
+      )
     })
   })
 
   test('list of different types', () => {
     const code: string = '1::true::5::nil;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int on left hand side of operation, got bool.')
+      expect(error.explain()).toMatch(
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "bool * int list".'
+      )
     })
   })
 
@@ -142,8 +146,11 @@ describe('list construction with :: and nil', () => {
     const code: string = '(1::3::nil)::[5::[7]];'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual({
-        type: ["int", 'list', 'list'],
-        value: [[1,3], [5,7]]
+        type: ['int', 'list', 'list'],
+        value: [
+          [1, 3],
+          [5, 7]
+        ]
       })
     })
   })
@@ -152,7 +159,7 @@ describe('list construction with :: and nil', () => {
     const code: string = '(true::(1+2=2)::nil)::[2 + 3 > 6]::[[true]];'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual({
-        type: ["bool", 'list', 'list'],
+        type: ['bool', 'list', 'list'],
         value: [[true, false], [false], [true]]
       })
     })
@@ -197,8 +204,8 @@ describe('list append with @', () => {
     const code: string = '[1]@[2]@[3];'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual({
-        type: ["int", 'list'],
-        value: [1,2,3]
+        type: ['int', 'list'],
+        value: [1, 2, 3]
       })
     })
   })
@@ -207,8 +214,8 @@ describe('list append with @', () => {
     const code: string = '[[1]]@([2::nil])@[[3]@[4]];'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual({
-        type: ["int", 'list', 'list'],
-        value: [[1], [2], [3,4]]
+        type: ['int', 'list', 'list'],
+        value: [[1], [2], [3, 4]]
       })
     })
   })
@@ -217,7 +224,7 @@ describe('list append with @', () => {
     const code: string = '[]@[[1], [2]]@nil@[[2], [3]]@[[]];'
     return runInContext(code, context, options).then(data => {
       expect((data as Finished).value).toStrictEqual({
-        type: ["int", 'list', 'list'],
+        type: ['int', 'list', 'list'],
         value: [[1], [2], [2], [3], []]
       })
     })
@@ -236,7 +243,9 @@ describe('list append with @', () => {
   test('append list of different types', () => {
     const code: string = '[1]@[2]@[true];'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected int list on right hand side of @, got bool list.')
+      expect(error.explain()).toMatch(
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "int list * bool list".'
+      )
     })
   })
 
@@ -244,7 +253,7 @@ describe('list append with @', () => {
     const code: string = '[1]@[[]];'
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        "Expected int list on right hand side of @, got 'a list list."
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "int list * \'a list list".'
       )
     })
   })
@@ -252,7 +261,9 @@ describe('list append with @', () => {
   test('append a non-list element', () => {
     const code: string = '[1]@2;'
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected list on right hand side of @, got int.')
+      expect(error.explain()).toMatch(
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "int list * int".'
+      )
     })
   })
 
@@ -260,7 +271,7 @@ describe('list append with @', () => {
     const code: string = '[[]]@[1];'
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        "Expected 'a list list or its superset on right hand side of @, got int list."
+        'Functions of type "\'a * \'a list -> \'a list" cannot take in an argument of type "\'a list list * int list".'
       )
     })
   })

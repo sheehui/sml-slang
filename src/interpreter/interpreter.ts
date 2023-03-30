@@ -94,8 +94,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   Literal: function* (node: es.Literal, _context: Context) {
     return {
       tag: 'lit',
-      val: node.value,
-      type: rttc.getTypeFromVal(node.value)
+      val: node.value === null ? [] : node.value,
+      type: cttc.getTypeFromVal(node.value)
     }
   },
 
@@ -140,13 +140,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       elems.push(left)
       elems.push(right)
       const op = tag === 'list_construct' ? "::" : "@" 
-      const error = rttc.checkBinaryExpression(node, op, {type: left.type, value: 0}, {type: right.type, value: 0})
-      if (error) {
-        throw error 
-      }
-      type = tag === 'list_construct' 
-        ? rttc.getConstructedTypedList(left, right, 0).type 
-        : rttc.getAppendedTypedList(left, right, 0).type
+      type = cttc.typeSchemeCheck(op, [left.type, right.type], undefined)?.return
     }
 
     return {
@@ -487,8 +481,8 @@ const microcode: { [tag: string]: Function } = {
       A.push({ tag: 'pop_i' })
     }
   },
-  lit: (cmd: { val: any }) => {
-    S.push(rttc.getTypedLiteral(cmd.val))
+  lit: (cmd: { val: any; type: SmlType }) => {
+    S.push({type: cmd.type, value: cmd.val})
   },
   id: (cmd: { sym: string }) => {
     let env: Environment | null = E
@@ -501,20 +495,20 @@ const microcode: { [tag: string]: Function } = {
     }
     throw Error(`Unbound variable ${cmd.sym}`)
   },
-  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; loc: es.SourceLocation }) => {
+  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; type: SmlType }) => {
     A.push({
       tag: 'binop_i',
       sym: cmd.sym,
-      loc: cmd.loc
+      type: cmd.type
     })
     A.push(cmd.frst)
     A.push(cmd.scnd)
   },
-  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation }) => {
+  unop: (cmd: { sym: es.BinaryOperator; arg: any; type: SmlType }) => {
     A.push({
       tag: 'unop_i',
       sym: cmd.sym,
-      loc: cmd.loc
+      type: cmd.type
     })
     A.push(cmd.arg)
   },
@@ -572,14 +566,14 @@ const microcode: { [tag: string]: Function } = {
       A.push(x)
     })
   },
-  list_append: (cmd: { elems: any[]; node: es.ArrayExpression; loc: es.SourceLocation }) => {
-    A.push({ tag: 'list_append_i', len: cmd.elems.length, loc: cmd.loc })
+  list_append: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
+    A.push({ tag: 'list_append_i', type: cmd.type })
     cmd.elems.forEach(x => {
       A.push(x)
     })
   },
-  list_construct: (cmd: { elems: any[]; node: es.ArrayExpression; loc: es.SourceLocation }) => {
-    A.push({ tag: 'list_construct_i', loc: cmd.loc })
+  list_construct: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
+    A.push({ tag: 'list_construct_i', type: cmd.type })
     cmd.elems.forEach(x => {
       A.push(x)
     })
@@ -611,27 +605,16 @@ const microcode: { [tag: string]: Function } = {
     A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node })
     A.push(cmd.pred)
   },
-  binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
+  binop_i: (cmd: { sym: es.BinaryOperator; type: SmlType }) => {
     const right = S.pop()
     const left = S.pop()
-    const result = binaryOp(cmd.sym, left, right, cmd.loc)
-    S.push(rttc.getTypedLiteral(result))
+    const value = binaryOp(cmd.sym, left, right)
+    S.push({ type: cmd.type, value })
   },
-  unop_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
+  unop_i: (cmd: { sym: es.UnaryOperator; type: SmlType }) => {
     const arg = S.pop()
-    const result = unaryOp(cmd.sym, arg, cmd.loc)
-    S.push(rttc.getTypedLiteral(result))
-  },
-  unop_check_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
-    const arg = S.pop()
-    // check if type match operator
-    const dummyNode: es.Node = { type: 'Literal', value: null }
-    const typeError = rttc.checkUnaryExpression(dummyNode, cmd.sym, arg)
-    if (typeError) {
-      throw typeError
-    }
-    // push some dummy object containing type onto stack
-    S.push({ type: rttc.operatorToResultType(cmd.sym, arg.type, arg.type), value: null })
+    const value = unaryOp(cmd.sym, arg)
+    S.push({ type: cmd.type, value })
   },
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env
@@ -652,17 +635,17 @@ const microcode: { [tag: string]: Function } = {
 
     S.push({ type: cmd.type, value: list })
   },
-  list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+  list_append_i: (cmd: { node: es.ArrayExpression; type: SmlType }) => {
     const left = S.pop()
     const right = S.pop()
-    const result = binaryOp('@', left, right, cmd.loc)
-    S.push(rttc.getAppendedTypedList(left, right, result))
+    const value = binaryOp('@', left, right)
+    S.push({ type: cmd.type, value })
   },
-  list_construct_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+  list_construct_i: (cmd: { node: es.ArrayExpression; type: SmlType }) => {
     const left = S.pop()
     const right = S.pop()
-    const result = binaryOp('::', left, right, cmd.loc)
-    S.push(rttc.getConstructedTypedList(left, right, result))
+    const value = binaryOp('::', left, right)
+    S.push({ type: cmd.type, value })
   },
   tuple_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const tuple = []
