@@ -16,14 +16,20 @@ describe('val declarations with no annotations', () => {
   test('simple val dec', () => {
     const code: string = 'val x = 3; x;'
     return runInContext(code, context, options).then(data => {
-      expect((data as Finished).value).toBe(3)
+      expect((data as Finished).value).toStrictEqual({
+        type: 'int',
+        value: 3
+      })
     })
   })
 
   test('list val dec', () => {
     const code: string = 'val x = [[1]]; x;'
     return runInContext(code, context, options).then(data => {
-      expect((data as Finished).value).toStrictEqual([[1]])
+      expect((data as Finished).value).toStrictEqual({
+        type: ['int', 'list', 'list'],
+        value: [[1]]
+      })
     })
   })
 
@@ -34,7 +40,10 @@ describe('val declarations with no annotations', () => {
         val add = ~x + y;
     `
     return runInContext(code, context, options).then(data => {
-      expect((data as Finished).value).toBe(1)
+      expect((data as Finished).value).toStrictEqual({
+        type: 'int',
+        value: 1
+      })
     })
   })
 

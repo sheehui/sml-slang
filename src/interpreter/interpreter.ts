@@ -748,5 +748,5 @@ export function* evaluate(node: es.Node, context: Context): any {
   const r = S.pop()
   console.log(r)
   console.log(cttc.getTypeEnv().head)
-  return r.value
+  return r
 }
