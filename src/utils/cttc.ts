@@ -41,6 +41,11 @@ const PRIM_TYPE_SCHEME: TypeSchemeFrame = {
   ]
 }
 
+const LIST_SCHEME: FunctionType = {
+  args: ["'a", ["'a", 'list']],
+  return: ["'a", 'list']
+}
+
 let typeSchemeEnv: TypeSchemeEnv = {
   head: PRIM_TYPE_SCHEME,
   tail: null
@@ -164,8 +169,13 @@ const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType> => {
  */
 
 export const typeSchemeCheck = (name: string, args: Array<any>, ret: any) => {
-  let expectedTypes: FunctionType | Array<FunctionType> = findSchemeInEnv(name)
   let found = undefined
+
+  if (name === '::' || name === '@') {
+    return unifyListOp(name, args)
+  }
+
+  let expectedTypes: FunctionType | Array<FunctionType> = findSchemeInEnv(name)
 
   if (!Array.isArray(expectedTypes)) {
     expectedTypes = [expectedTypes]
@@ -359,10 +369,6 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) => {
 }
 
 export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType => {
-  const scheme: FunctionType = {
-    args: ["'a", ["'a", 'list']],
-    return: ["'a", 'list']
-  }
   if (constrainType(currType, newType)) {
     return isFreeList(currType)
       ? isFreeList(newType)
@@ -375,7 +381,7 @@ export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType =
     if (Array.isArray(currType)) {
       currType.push('list')
     }
-    throw new FunctionTypeError(scheme, {args: [newType, currType], return: 'free'})
+    throw new FunctionTypeError(LIST_SCHEME, { args: [newType, currType], return: 'free' })
   }
 }
 
@@ -387,7 +393,85 @@ export const getDeclaredListType = (first: SmlType | undefined): SmlType => {
     if (!Array.isArray(typeArr)) {
       throw Error('Cannot push to a non array type.')
     }
-    
+
     return typeArr.concat(['list'])
   }
+}
+
+function unifyListOp(op: '::' | '@', args: any[]) {
+  let type = undefined
+  const left = args[0]
+  const right = args[1]
+
+  switch (op) {
+    case '::':
+      type = unifyListConstruct(left, right)
+      break
+    case '@':
+      type = unifyListAppend(left, right)
+      break
+    default:
+      throw Error('Unsupported list operation ' + op)
+  }
+
+  if (!type) {
+    throw new FunctionTypeError(LIST_SCHEME, { args, return: 'free' })
+  }
+  return { args, return: type }
+}
+
+function unifyListConstruct(left: SmlType[], right: SmlType[]) {
+  if (!isTypedList(right)) {
+    // right side needs to be some list
+    return
+  }
+
+  if (isFreeList(right)) {
+    // valid construct
+    let typeArr = right
+    if (!isFreeList(left)) {
+      // assign a fixed type
+      typeArr[0] = isTypedList(left) ? left[0] : left
+      if (isTypedList(left)) {
+        typeArr.push('list')
+      }
+    } else if (getListDepth(right) <= getListDepth(left)) {
+      typeArr = left
+      typeArr.push('list')
+    }
+    return typeArr
+  }
+
+  // For valid ::, LHS type must match elem type of list in RHS
+  const rightTypeArr: Array<SmlType> = right
+  const expectedTypeArr: Array<SmlType> = rightTypeArr.slice(0, rightTypeArr.length - 1)
+  const gotTypeArr: Array<SmlType> = isListOrTuple(left) ? left : [left]
+
+  if (isStrictEqual(gotTypeArr, expectedTypeArr)) {
+    return right
+  }
+  return
+}
+
+function unifyListAppend(left: SmlType[], right: SmlType[]) {
+  if (!isTypedList(right) || !isTypedList(left)) {
+    // right side needs to be some list
+    return
+  }
+
+  if (isFreeList(left)) {
+    // right must be a superset OR any free list
+    if (isFreeList(right) || constrainType(right, left)) {
+      return right
+    }
+  } else {
+    // right must be a free list of <= left depth OR same type
+    if (
+      (isFreeList(right) && getListDepth(right) <= getListDepth(left)) ||
+      isStrictEqual(left, right)
+    ) {
+      return left
+    }
+  }
+  return
 }

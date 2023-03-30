@@ -140,13 +140,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       elems.push(left)
       elems.push(right)
       const op = tag === 'list_construct' ? "::" : "@" 
-      const error = rttc.checkBinaryExpression(node, op, {type: left.type, value: 0}, {type: right.type, value: 0})
-      if (error) {
-        throw error 
-      }
-      type = tag === 'list_construct' 
-        ? rttc.getConstructedTypedList(left, right, 0).type 
-        : rttc.getAppendedTypedList(left, right, 0).type
+      type = cttc.typeSchemeCheck(op, [left.type, right.type], undefined)?.return
     }
 
     return {
