@@ -215,10 +215,6 @@ const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
     args.push(substitued)
   }
 
-  // if (!givenType.return) { // undefined
-  //   givenType.return = "'a"
-  // }
-
   const resultType = constrainType(schemeType.return, givenType.return)
   if (!resultType) {
     // wrong error msg

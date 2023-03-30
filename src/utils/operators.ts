@@ -119,20 +119,9 @@ export function boolOrErr(candidate: any, line: number, column: number) {
   }
 }
 
-export function unaryOp(operator: UnaryOperator, argument: any, loc: SourceLocation) {
-  argument = forceIt(argument)
-  const line = loc.start.line
-  const column = loc.start.column
-  const error = rttc.checkUnaryExpression(
-    create.locationDummyNode(line, column),
-    operator,
-    argument
-  )
-  if (error === undefined) {
-    return evaluateUnaryExpression(operator, argument)
-  } else {
-    throw error
-  }
+export function unaryOp(operator: UnaryOperator, argument: any) {
+  forceIt(argument)
+  return evaluateUnaryExpression(operator, argument)
 }
 
 export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
@@ -148,24 +137,11 @@ export function evaluateUnaryExpression(operator: UnaryOperator, value: any) {
 export function binaryOp(
   operator: BinaryOperator | '::' | '@',
   left: TypedValue,
-  right: TypedValue,
-  loc: SourceLocation
+  right: TypedValue
 ) {
   left = forceIt(left)
   right = forceIt(right)
-  const line = loc.start.line
-  const column = loc.start.column
-  const error = rttc.checkBinaryExpression(
-    create.locationDummyNode(line, column),
-    operator,
-    left,
-    right
-  )
-  if (error === undefined) {
-    return evaluateBinaryExpression(operator, left, right)
-  } else {
-    throw error
-  }
+  return evaluateBinaryExpression(operator, left, right)
 }
 
 export function evaluateBinaryExpression(operator: BinaryOperator | string, left: any, right: any) {
