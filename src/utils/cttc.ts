@@ -146,7 +146,6 @@ export const isInTypeEnv = (vars: string): boolean => {
 }
 
 const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
-  console.log(toReplace, replacement)
   let env: TypeEnv | null = typeEnv
   let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv 
   while (env && schemeEnv) {
@@ -175,6 +174,8 @@ const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
   }
 }
 
+// finds most recent occurance of sym in the env, if its a free variable (i.e. T0) 
+// replace it with a free function type (i.e. Tn1 -> Tn2)
 export const modifyTypeScheme = (sym: string, replacement: FunctionType) => {
   let env: TypeEnv | null = typeEnv
   let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv 
@@ -185,8 +186,10 @@ export const modifyTypeScheme = (sym: string, replacement: FunctionType) => {
       return 
     }
     if (frame.hasOwnProperty(sym)) {
-      delete frame[sym]
-      schemeFrame[sym] = replacement
+      if (isTypeVar(frame[sym])) {
+        delete frame[sym]
+        schemeFrame[sym] = replacement
+      }
       return 
     }
     schemeEnv = schemeEnv.tail 

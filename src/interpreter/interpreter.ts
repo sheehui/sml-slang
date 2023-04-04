@@ -170,7 +170,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     cttc.extendSchemeEnv([], [])
 
     for (let i = 0; i < node.params.length; i++) {
-      cttc.addToTypeFrame((node.params[i] as any).name, cttc.newTypeVar()) // some unassigned type (normal var by default)
+      // add some unassigned type to type env (normal var by default)
+      // if it end up being a function type we handle it in the CallExpression
+      cttc.addToTypeFrame((node.params[i] as any).name, cttc.newTypeVar()) 
 
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
       params.push(param)
@@ -178,14 +180,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     const body = yield* evaluators[node.body.type](node.body, context) 
 
+    // convert params to a SmlType 
     for (let i = 0; i < params.length; i++) {
       paramsTypes.push(cttc.findTypeInEnv(params[i].sym))
-      console.log(cttc.findTypeInEnv(params[i].sym), params[i].sym)
       if (i === params.length - 1 && i > 0) {
         paramsTypes.push('tuple')
       }
     }
-
     paramsTypes = paramsTypes.length === 1 
       ? paramsTypes[0]
       : paramsTypes
@@ -199,10 +200,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       body,
       id: node.id ? yield* evaluators[node.id.type](node.id, context) : node.id,
       type: [paramsTypes, body.type, 'fun'], 
-      // type: {
-      //   args: paramsTypes, 
-      //   return: body.type
-      // }
     }
   },
 
@@ -227,7 +224,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       fun.push(args)
       fun.push(valType.return) 
       fun.push('fun') 
-      valType =fun
+      valType = fun
     }
 
     return {
@@ -239,10 +236,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   CallExpression: function* (node: es.CallExpression, context: Context) {
     if (node.callee.type === 'Identifier') {
+      // param types are Tn by default, so replace with Tn -> Tn1 if needed
       cttc.modifyTypeScheme(node.callee.name, cttc.newSchemeVar()) 
     }
     const fun = yield* evaluators[node.callee.type](node.callee, context)
-    const paramTypes = fun.type[0] 
+    const paramTypes = fun.type[0] // fun.type is a SmlType 
 
     let argTypes = []
     const args = [] 
@@ -251,13 +249,14 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       argTypes.push(arg.type)
       args.push(arg)
     }
+
+    // convert argTypes to a SmlType 
     argTypes.push('tuple')
     argTypes = argTypes.length <= 2 ? argTypes[0] : argTypes
-    cttc.unifyReturnType(paramTypes, argTypes)
-    console.log(cttc.getSchemeEnv())
 
-    // const type = fun.type.return 
-    const type = fun.type[1]     
+    cttc.unifyReturnType(paramTypes, argTypes)
+
+    const type = fun.type[1] // take the return type of fun as the call type 
     return {
       tag: 'app', 
       fun, 
@@ -596,8 +595,8 @@ const microcode: { [tag: string]: Function } = {
     A.push({ tag: 'assmt_i', id: cmd.id, frameOffset: cmd.frameOffset })
     A.push(cmd.expr)
   },
-  lam: (cmd: { params: any[]; body: es.BlockStatement; id: any }) => {
-    A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E })
+  lam: (cmd: { params: any[]; body: es.BlockStatement; id: any; type: SmlType }) => {
+    A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E, type: cmd.type })
   },
   list_lit: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
     A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node, type: cmd.type })
@@ -728,8 +727,8 @@ const microcode: { [tag: string]: Function } = {
     const pred = S.pop()
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
-  closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
-    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
+  closure_i: (cmd: { params: any[]; body: any; env: Environment; type: SmlType }) => {
+    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env, type: cmd.type })
   },
   pop_i: () => {
     S.pop()

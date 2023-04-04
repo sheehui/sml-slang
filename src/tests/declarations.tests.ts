@@ -72,4 +72,56 @@ describe('val declarations with no annotations', () => {
       )
     })
   })
+
+  test('function parameters inferred from body binop', () => {
+    const code: string = `
+        val x = fn y => y > 1;
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual(['int', 'bool', 'fun'])
+    })
+  })
+
+  test('function parameters inferred from body unop', () => {
+    const code: string = `
+        val x = fn y => not y;
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual(['bool', 'bool', 'fun'])
+    })
+  })
+
+  test('function parameters inferred from body fun app', () => {
+    const code: string = `
+        val x = fn y => y(true) + 1;
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual([['bool', 'int', 'fun'], 'int', 'fun'])
+    })
+  })
+
+  test('nested function', () => {
+    const code: string = `
+        val a = fn x => x + 1; 
+        fun test x = fn y => y(a) > x(1);
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual([
+        ['int', 'int', 'fun'],
+        [[['int', 'int', 'fun'], 'int', 'fun'], 'bool', 'fun'], 
+        'fun'
+      ])
+    })
+  })
+
+  test('infer type from conditional expr', () => {
+    const code: string = `
+        val a = 4; 
+        val b = 10;   
+        val x = if true then a else b; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual('int')
+    })
+  })
 })
