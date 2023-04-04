@@ -161,7 +161,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       yield* evaluators[node.id.type](node.id, context)
     }
     const params = []
-    const paramsTypes : Array<SmlType | cttc.FunctionType> = [] 
+    let paramsTypes : SmlType = [] 
 
     // extend env here to eval func block
     const initEnv = cttc.getTypeEnv()
@@ -170,8 +170,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     cttc.extendSchemeEnv([], [])
 
     for (let i = 0; i < node.params.length; i++) {
-      cttc.addToTypeFrame((node.params[i] as any).name, cttc.newTypeVar()) // some unassigned type
-      // cttc.addToSchemeFrame((node.params[i] as any).name, cttc.newSchemeVar()) // may be a function too 
+      cttc.addToTypeFrame((node.params[i] as any).name, cttc.newTypeVar()) // some unassigned type (normal var by default)
 
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
       params.push(param)
@@ -181,10 +180,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     for (let i = 0; i < params.length; i++) {
       paramsTypes.push(cttc.findTypeInEnv(params[i].sym))
-      // if (i === params.length - 1 && i > 0) {
-      //   paramsTypes.push('tuple')
-      // }
+      console.log(cttc.findTypeInEnv(params[i].sym), params[i].sym)
+      if (i === params.length - 1 && i > 0) {
+        paramsTypes.push('tuple')
+      }
     }
+
+    paramsTypes = paramsTypes.length === 1 
+      ? paramsTypes[0]
+      : paramsTypes
 
     // finish eval func block so restore the env
     cttc.restoreTypeEnv(initEnv)
@@ -194,11 +198,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       params,
       body,
       id: node.id ? yield* evaluators[node.id.type](node.id, context) : node.id,
-      // type: [paramsTypes, body.type, 'fun'], 
-      type: {
-        args: paramsTypes, 
-        return: body.type
-      }
+      type: [paramsTypes, body.type, 'fun'], 
+      // type: {
+      //   args: paramsTypes, 
+      //   return: body.type
+      // }
     }
   },
 
@@ -216,8 +220,14 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       cttc.addToTypeFrame(node.name, valType)
     }
 
-    if (cttc.isTypedFun(valType)) {
-      valType = cttc.smlToFuncType(valType)
+    // convert from scheme to smltype 
+    if (cttc.isFuncType(valType)) {
+      const fun = [] 
+      const args = valType.args.length === 1 ? valType.args[0] : [...valType.args, 'tuple'] 
+      fun.push(args)
+      fun.push(valType.return) 
+      fun.push('fun') 
+      valType =fun
     }
 
     return {
@@ -229,12 +239,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   CallExpression: function* (node: es.CallExpression, context: Context) {
     if (node.callee.type === 'Identifier') {
-      cttc.addToSchemeFrame(node.callee.name, cttc.newSchemeVar()) 
+      cttc.modifyTypeScheme(node.callee.name, cttc.newSchemeVar()) 
     }
     const fun = yield* evaluators[node.callee.type](node.callee, context)
-    let paramTypes = Array.isArray(fun.type.args) ? [...fun.type.args] : [fun.type.args] 
-    paramTypes.push('tuple')
-    paramTypes = paramTypes.length <= 2 ? paramTypes[0] : paramTypes 
+    const paramTypes = fun.type[0] 
 
     let argTypes = []
     const args = [] 
@@ -246,8 +254,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     argTypes.push('tuple')
     argTypes = argTypes.length <= 2 ? argTypes[0] : argTypes
     cttc.unifyReturnType(paramTypes, argTypes)
+    console.log(cttc.getSchemeEnv())
 
-    const type = fun.type.return 
+    // const type = fun.type.return 
+    const type = fun.type[1]     
     return {
       tag: 'app', 
       fun, 
@@ -275,7 +285,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
+    console.log(frst, "FRST")
     const scnd = yield* evaluators[node.left.type](node.left, context)
+    console.log(scnd, "SCND")
     const type = cttc.typeSchemeCheck(node.operator, [scnd, frst], undefined)
 
     return {
@@ -302,19 +314,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
     const pred = yield* evaluators[node.test.type](node.test, context)
-    if (!rttc.typeArrEqual(pred.type, 'bool')) {
+    if (pred.type !== 'bool') {
       throw new rttc.TypeError(node, " as predicate", 'boolean', pred.type)
     }
     const cons = yield* evaluators[node.consequent.type](node.consequent, context)
     const alt = yield* evaluators[node.alternate.type](node.alternate, context)
-
-    const subsetOfConsAlt = rttc.isTypeArrSubset(cons.type, alt.type)
-    const subsetOfAltCons = rttc.isTypeArrSubset(alt.type, cons.type)
-
-    // check if neither types of cons and alt are subsets of the other
-    if (!subsetOfConsAlt || !subsetOfAltCons) {
-      throw Error(`Match rules disagree on type: Cannot merge '${cons.type}' and '${alt.type}'`)
-    }
+    const type = cttc.unifyReturnType(cons.type, alt.type) 
 
     return {
       tag: 'cond_expr', 
@@ -322,7 +327,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       cons,
       alt,
       node: node,
-      type: subsetOfConsAlt ? subsetOfConsAlt : subsetOfAltCons,
+      type
     }
   },
 
@@ -355,7 +360,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       }
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
-      cttc.isFuncType(expr.type) 
+      cttc.isTypedFun(expr.type)
         ? cttc.addToSchemeFrame((decl.id as any).name, cttc.newSchemeVar()) 
         : cttc.addToTypeFrame((decl.id as any).name, cttc.newTypeVar()) 
       
@@ -365,21 +370,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         cttc.restoreTypeEnv(initEnv)
         cttc.restoreSchemeEnv(initSchemeEnv) 
       }
-      // console.log(id.type, "IDTYPE")
-      // console.log(expr.type, "EXPRTYPE")
-      let type = undefined 
-      if (id.type.args && expr.type.args) { // both are functions 
-        type = cttc.unifyScheme(id.type, expr.type)
-        if (type === undefined) {
-          throw new FunctionTypeError(id.type, expr.type)
-        }
-        cttc.addToSchemeFrame(id.sym, type) 
-      } else if (!id.type.args && !expr.type.args) { // both are not functions  
-        type = cttc.unifyReturnType(id.type, expr.type)
-        cttc.addToTypeFrame(id.sym, type) 
-      } else { // error  
-        throw new ReturnTypeError(id.type, expr.type) 
-      }
+
+      const type = cttc.unifyReturnType(id.type, expr.type) 
+      cttc.addToTypeFrame(id.sym, type) 
       
       ids.push(id)
       exprs.push(expr)

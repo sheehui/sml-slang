@@ -146,6 +146,7 @@ export const isInTypeEnv = (vars: string): boolean => {
 }
 
 const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
+  console.log(toReplace, replacement)
   let env: TypeEnv | null = typeEnv
   let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv 
   while (env && schemeEnv) {
@@ -174,6 +175,26 @@ const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
   }
 }
 
+export const modifyTypeScheme = (sym: string, replacement: FunctionType) => {
+  let env: TypeEnv | null = typeEnv
+  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv 
+  while (env && schemeEnv) {
+    const frame: TypeFrame = env.head
+    const schemeFrame: TypeSchemeFrame = schemeEnv.head
+    if (schemeFrame.hasOwnProperty(sym)) {
+      return 
+    }
+    if (frame.hasOwnProperty(sym)) {
+      delete frame[sym]
+      schemeFrame[sym] = replacement
+      return 
+    }
+    schemeEnv = schemeEnv.tail 
+    env = env.tail
+  }
+  throw Error(`Unbound variable ${sym}`)
+}
+
 /**
  * Type Scheme Environment Support
  */
@@ -193,9 +214,13 @@ export interface TypeSchemeFrame {
 }
 
 export const resetSchemeEnv = () => {
-  typeSchemeEnv = {
+  const tail = {
     head: PRIM_TYPE_SCHEME,
     tail: null
+  }
+  typeSchemeEnv = {
+    head: {}, 
+    tail
   }
 }
 

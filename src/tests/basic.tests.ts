@@ -836,7 +836,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        'Functions of type \"int -> int\" cannot take in an argument of type \"int\".'
+        "The annotated type \"int -> int\" does not match expression's type \"int -> bool\"."
       )
     })
   })
@@ -867,7 +867,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        "Functions of type \"int -> bool\" cannot take in an argument of type \"bool\"."
+        "The annotated type \"int -> bool\" does not match expression's type \"bool -> int\"."
       )
     })
   })
@@ -1004,7 +1004,7 @@ describe('type annotations', () => {
       val result : string = if (b) then c else a;
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.message).toMatch("Match rules disagree on type: Cannot merge 'string' and 'int'")
+      expect(error.explain()).toMatch("The annotated type \"string\" does not match expression's type \"int\".")
     })
   })
 
