@@ -272,8 +272,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
     const type = cttc.typeSchemeCheck(node.operator, [arg], undefined)
+    const [isEval, res] = cttc.partialEvaluate([arg], node.operator)
 
-    return {
+    return isEval ? {
+      tag: 'lit',
+      val: res,
+      type: type?.return
+    }:{
       tag: 'unop',
       sym: node.operator, 
       arg,
@@ -283,11 +288,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
-    const frst = yield* evaluators[node.right.type](node.right, context)
-    const scnd = yield* evaluators[node.left.type](node.left, context)
-    const type = cttc.typeSchemeCheck(node.operator, [scnd, frst], undefined)
+    const scnd = yield* evaluators[node.right.type](node.right, context)
+    const frst = yield* evaluators[node.left.type](node.left, context)
+    const type = cttc.typeSchemeCheck(node.operator, [frst, scnd], undefined)
+    const [isEval, res] = cttc.partialEvaluate([frst, scnd], node.operator)
 
-    return {
+    return isEval ? {
+      tag: 'lit',
+      val: res,
+      type: type?.return
+    } : {
       tag: 'binop',
       sym: node.operator,
       frst,
@@ -556,8 +566,8 @@ const microcode: { [tag: string]: Function } = {
       sym: cmd.sym,
       type: cmd.type
     })
-    A.push(cmd.frst)
     A.push(cmd.scnd)
+    A.push(cmd.frst)
   },
   unop: (cmd: { sym: es.BinaryOperator; arg: any; type: SmlType }) => {
     A.push({
@@ -765,8 +775,8 @@ export function* evaluate(node: es.Node, context: Context): any {
   while (i < step_limit) {
     if (A.size() === 0) break
     const cmd = A.pop()
-    // console.log('\n=====instruction====')
-    // console.log(cmd)
+    console.log('\n=====instruction====')
+    console.log(cmd)
     // console.log("\n=====agenda====")
     // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
@@ -776,7 +786,7 @@ export function* evaluate(node: es.Node, context: Context): any {
       // console.log('after stash:')
       // S.print() // print stash
     } else {
-      console.log('error')
+      throw Error("Unsupported microcode tag: " + cmd.tag)
     }
     i++
   }
