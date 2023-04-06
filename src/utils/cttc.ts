@@ -103,11 +103,14 @@ export const addToTypeFrame = (vars: string, type: SmlType, offset: number = 0) 
   if (isTypedFun(type)) {
     // add to type scheme env, remove key from typeEnv 
     delete env.head[vars]
-    return schemeEnv.head[vars] = smlToFuncType(type)
+    const funcType = smlToFuncType(type)
+    return schemeEnv.head[vars] = funcType
+    return funcType
   }
   // remove key from typeSchemeEnv 
   delete schemeEnv.head[vars] 
-  return env.head[vars] = type
+  env.head[vars] = type
+  return type 
 }
 
 export const restoreTypeEnv = (env: TypeEnv) => {
@@ -375,10 +378,11 @@ export const smlToFuncType = (v: SmlType) : FunctionType => {
   const smlRet : SmlType = v[1] 
   let args = isTypedTuple(smlParams) ? smlParams.slice(0, -1) : [smlParams]
   args = (args as Array<SmlType>).map(x => x === undefined ? newTypeVar() : x) 
-  return {
+  const newRet = {
     args,
     return: smlRet !== undefined ? smlRet : newTypeVar() 
   }
+  return newRet 
 } 
 
 const typeOf = (v: Value) => {
@@ -489,6 +493,16 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) : any => {
 
   if (isTypedTuple(scheme) && isTypedTuple(given)) {
     // recursion
+    const result = []
+    for (let i = 0; i < scheme.length - 1; i++) {
+      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType) 
+      if (!constrained) {
+        return constrained 
+      }
+      result.push(constrained)
+    }
+    result.push('tuple')
+    return result 
   }
 
   if (isFreeLiteral(scheme) || isFreeLiteral(given)) {

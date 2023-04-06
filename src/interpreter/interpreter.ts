@@ -214,7 +214,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         ? cttc.findTypeInEnv(node.name) 
         : cttc.findSchemeInEnv(node.name)
     } else {
-      cttc.addToTypeFrame(node.name, valType)
+      valType = cttc.addToTypeFrame(node.name, valType)
     }
 
     // convert from scheme to smltype 
@@ -384,7 +384,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         : cttc.addToTypeFrame((decl.id as any).name, cttc.newTypeVar()) 
       
       const id = yield* evaluators[decl.id.type](decl.id, context)
-
       const type = cttc.unifyReturnType(id.type, expr.type) 
       cttc.addToTypeFrame(id.sym, type) 
       

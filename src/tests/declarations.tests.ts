@@ -124,4 +124,37 @@ describe('val declarations with no annotations', () => {
       expect((data as Finished).value.type).toStrictEqual('int')
     })
   })
+
+  test('infer type from let expr', () => {
+    const code: string = `
+        val x = 
+        let 
+          val y = 2; 
+          val z = 3; 
+          val a = fn (x, y) => x > y; 
+        in 
+          a(y, z);
+        end; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual('bool')
+    })
+  })
+
+  test('infer type with local', () => {
+    const code: string = `
+        local 
+          val x = 5; 
+          val y = "hello"; 
+          val z = fn x => x > 10; 
+        in 
+          val a = z(x); 
+          val b = if (a) then y else "world"; 
+        end; 
+        val c = b;
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual('string')
+    })
+  })
 })
