@@ -6,6 +6,7 @@ import {
   ReturnTypeError
 } from '../errors/compileTimeSourceError'
 import { ErrorSeverity, ErrorType, SmlType, Value } from '../types'
+import { binaryOp, unaryOp } from './operators'
 
 let typeEnv: TypeEnv = {
   head: {},
@@ -162,6 +163,33 @@ const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType> => {
     env = env.tail
   }
   throw Error(`Unbound variable ${vars}`)
+}
+
+/**
+ * Partial Evaluation
+ */
+export const partialEvaluate = (args: any[], op: string) => {
+  if (args.length > 2) {
+    throw Error(`Unsupported number of args for partial evaluation, expect unop or binop got ${args.length}.`)
+  }
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].tag !== "lit") {
+      return [false, undefined]
+    }
+  }
+
+  if (args.length == 1) {
+    const elem = {type: args[0].type, value: args[0].val}
+    return [true, unaryOp(op as es.UnaryOperator, elem)]
+  }
+
+  if (args.length == 2) {
+    const left = {type: args[0].type, value: args[0].val}
+    const right = {type: args[1].type, value: args[1].val}
+    return [true, binaryOp(op as es.BinaryOperator, left, right)]
+  }
+  return [false, undefined]
 }
 
 /**
