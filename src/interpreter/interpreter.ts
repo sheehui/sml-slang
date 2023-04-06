@@ -284,9 +284,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
     const frst = yield* evaluators[node.right.type](node.right, context)
-    console.log(frst, "FRST")
     const scnd = yield* evaluators[node.left.type](node.left, context)
-    console.log(scnd, "SCND")
     const type = cttc.typeSchemeCheck(node.operator, [scnd, frst], undefined)
 
     return {
@@ -343,19 +341,41 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     let localDecs = null 
     let localArity = null 
 
-
     for (let i = 0; i < node.declarations.length; i++) {
       const decl = node.declarations[i]
       // deal with local declarations
       const locals = (decl as any).locals 
-      const initEnv = cttc.getTypeEnv()
-      const initSchemeEnv = cttc.getSchemeEnv()
+      
       if (locals) {
+        const initEnv = cttc.getTypeEnv()
+        const initSchemeEnv = cttc.getSchemeEnv()
         cttc.extendTypeEnv([], [])
         cttc.extendSchemeEnv([], [])
         localStartIdx = i
         localDecs = yield* evaluators[locals.decs.type](locals.decs, context)
         localArity = locals.arity
+
+        const end = i + localArity 
+        while (i < end) {
+          const decl = node.declarations[i]
+          const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+          cttc.isTypedFun(expr.type)
+            ? cttc.addToSchemeFrame((decl.id as any).name, cttc.newSchemeVar()) 
+            : cttc.addToTypeFrame((decl.id as any).name, cttc.newTypeVar()) 
+          
+          const id = yield* evaluators[decl.id.type](decl.id, context)
+          const type = cttc.unifyReturnType(id.type, expr.type) 
+          cttc.addToTypeFrame(id.sym, type, 1)
+          
+          ids.push(id)
+          exprs.push(expr)
+          i++  
+        }
+
+        cttc.restoreTypeEnv(initEnv)
+        cttc.restoreSchemeEnv(initSchemeEnv)
+        i-- 
+        continue 
       }
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
@@ -365,17 +385,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       
       const id = yield* evaluators[decl.id.type](decl.id, context)
 
-      if (locals) {
-        cttc.restoreTypeEnv(initEnv)
-        cttc.restoreSchemeEnv(initSchemeEnv) 
-      }
-
       const type = cttc.unifyReturnType(id.type, expr.type) 
       cttc.addToTypeFrame(id.sym, type) 
       
       ids.push(id)
       exprs.push(expr)
     }
+
     return {
       tag: 'var',
       ids, 
@@ -419,7 +435,8 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const body = []
     let type = undefined 
     const locals = (node as any).locals
-    const initEnv = cttc.getTypeEnv()  
+    const initEnv = cttc.getTypeEnv()
+    const initSchemeEnv = cttc.getSchemeEnv()  
     if (locals) {
       cttc.extendTypeEnv([], []) 
       cttc.extendSchemeEnv([], [])
@@ -437,6 +454,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     if (locals) {
       // restore env 
       cttc.restoreTypeEnv(initEnv)
+      cttc.restoreSchemeEnv(initSchemeEnv) 
     }
     
     return locals ? {

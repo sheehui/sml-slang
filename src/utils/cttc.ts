@@ -91,15 +91,23 @@ export const extendTypeEnv = (vars: string[], types: SmlType[]): TypeEnv => {
   return typeEnv
 }
 
-export const addToTypeFrame = (vars: string, type: SmlType) => {
+export const addToTypeFrame = (vars: string, type: SmlType, offset: number = 0) => {
+  let env: TypeEnv = typeEnv
+  let schemeEnv: TypeSchemeEnv = typeSchemeEnv
+  while (offset > 0 && env.tail && schemeEnv.tail) {
+    env = env.tail
+    schemeEnv = schemeEnv.tail
+    offset-- 
+  }
+
   if (isTypedFun(type)) {
     // add to type scheme env, remove key from typeEnv 
-    delete typeEnv[vars]
-    return typeSchemeEnv[vars] = smlToFuncType(type)
+    delete env.head[vars]
+    return schemeEnv.head[vars] = smlToFuncType(type)
   }
   // remove key from typeSchemeEnv 
-  delete typeSchemeEnv[vars] 
-  return typeEnv.head[vars] = type
+  delete schemeEnv.head[vars] 
+  return env.head[vars] = type
 }
 
 export const restoreTypeEnv = (env: TypeEnv) => {
