@@ -141,7 +141,7 @@ const argToString = (type: FunctionType): string => {
   return result
 }
 
-const smlTypeToString = (type: SmlType): string => {
+export const smlTypeToString = (type: SmlType): string => {
   const isTypeArr = Array.isArray(type)
   if (isTypeArr && type[type.length - 1] == 'list') {
     let str = ''
