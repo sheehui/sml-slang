@@ -85,6 +85,28 @@ export class PredicateTypeError extends CompileTimeSourceError {
   }
 }
 
+export class MatchTypeError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
+
+  constructor(public expected: SmlType, public got: SmlType) {
+    super()
+    this.expected = expected
+    this.got = got
+  }
+
+  public explain() {
+    return `Match rules disagree on type: Cannot merge "${smlTypeToString(
+      this.expected
+    )}" and "${smlTypeToString(this.got)}".`
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
 const functionTypeToString = (type: FunctionType): string => {
   let result = ''
 

@@ -3,6 +3,7 @@ import * as es from 'estree'
 import {
   CompileTimeSourceError,
   FunctionTypeError,
+  MatchTypeError,
   ReturnTypeError
 } from '../errors/compileTimeSourceError'
 import { ErrorSeverity, ErrorType, FreeType, SmlType, Value } from '../types'
@@ -11,7 +12,7 @@ import { binaryOp, unaryOp } from './operators'
 let typeEnv: TypeEnv = {
   head: {},
   tail: null,
-  index: 0,
+  index: 0
 }
 
 const PRIM_TYPE_SCHEME: TypeSchemeFrame = {
@@ -59,7 +60,7 @@ let typeSchemeEnv: TypeSchemeEnv = {
 
 export interface TypeEnv {
   tail: TypeEnv | null
-  head: TypeFrame,
+  head: TypeFrame
   index: number
 }
 
@@ -98,29 +99,29 @@ export const addToTypeFrame = (vars: string, type: SmlType, offset: number = 0) 
   while (offset > 0 && env.tail && schemeEnv.tail) {
     env = env.tail
     schemeEnv = schemeEnv.tail
-    offset-- 
+    offset--
   }
 
   if (isTypedFun(type)) {
-    // add to type scheme env, remove key from typeEnv 
+    // add to type scheme env, remove key from typeEnv
     delete env.head[vars]
     const funcType = smlToFuncType(type)
-    return schemeEnv.head[vars] = funcType
+    return (schemeEnv.head[vars] = funcType)
     return funcType
   }
-  // remove key from typeSchemeEnv 
-  delete schemeEnv.head[vars] 
+  // remove key from typeSchemeEnv
+  delete schemeEnv.head[vars]
   env.head[vars] = type
-  return type 
+  return type
 }
 
 export const restoreTypeEnv = (env: TypeEnv) => {
   typeEnv = env
 }
 
-export const newTypeVar = () : FreeType => {
-  const newTypeVar : FreeType = `T${typeEnv.index}`
-  typeEnv.index++ 
+export const newTypeVar = (): FreeType => {
+  const newTypeVar: FreeType = `T${typeEnv.index}`
+  typeEnv.index++
   return newTypeVar
 }
 
@@ -129,7 +130,7 @@ export const findTypeInEnv = (vars: string): SmlType => {
   let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
   while (env && schemeEnv) {
     const frame: TypeFrame = env.head
-    const schemeFrame: TypeSchemeFrame = schemeEnv.head 
+    const schemeFrame: TypeSchemeFrame = schemeEnv.head
     if (frame.hasOwnProperty(vars)) {
       return frame[vars]
     }
@@ -159,10 +160,10 @@ export const isInTypeEnv = (vars: string): boolean => {
 
 const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
   let env: TypeEnv | null = typeEnv
-  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv 
+  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
   while (env && schemeEnv) {
     const frame: TypeFrame = env.head
-    const schemeFrame: TypeSchemeFrame = schemeEnv.head 
+    const schemeFrame: TypeSchemeFrame = schemeEnv.head
     for (const key in frame) {
       if (frame[key] === toReplace) {
         frame[key] = replacement
@@ -172,39 +173,39 @@ const replaceTypeVar = (toReplace: FreeType, replacement: SmlType) => {
       const scheme = schemeFrame[key]
       if (Array.isArray(scheme)) {
         for (let i = 0; i < scheme.length; i++) {
-          const curr = scheme[i] 
-          curr.args = curr.args.map(x => x === toReplace ? replacement : x) 
-          curr.return = curr.return === toReplace ? replacement : curr.return 
+          const curr = scheme[i]
+          curr.args = curr.args.map(x => (x === toReplace ? replacement : x))
+          curr.return = curr.return === toReplace ? replacement : curr.return
         }
       } else {
-        scheme.args = scheme.args.map(x => x === toReplace ? replacement : x) 
-        scheme.return = scheme.return === toReplace ? replacement : scheme.return 
+        scheme.args = scheme.args.map(x => (x === toReplace ? replacement : x))
+        scheme.return = scheme.return === toReplace ? replacement : scheme.return
       }
     }
-    schemeEnv = schemeEnv.tail 
+    schemeEnv = schemeEnv.tail
     env = env.tail
   }
 }
 
-// finds most recent occurance of sym in the env, if its a free variable (i.e. T0) 
+// finds most recent occurance of sym in the env, if its a free variable (i.e. T0)
 // replace it with a free function type (i.e. Tn1 -> Tn2)
 export const modifyTypeScheme = (sym: string, replacement: FunctionType) => {
   let env: TypeEnv | null = typeEnv
-  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv 
+  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
   while (env && schemeEnv) {
     const frame: TypeFrame = env.head
     const schemeFrame: TypeSchemeFrame = schemeEnv.head
     if (schemeFrame.hasOwnProperty(sym)) {
-      return 
+      return
     }
     if (frame.hasOwnProperty(sym)) {
       if (isTypeVar(frame[sym])) {
         delete frame[sym]
         schemeFrame[sym] = replacement
       }
-      return 
+      return
     }
-    schemeEnv = schemeEnv.tail 
+    schemeEnv = schemeEnv.tail
     env = env.tail
   }
   throw Error(`Unbound variable ${sym}`)
@@ -234,19 +235,19 @@ export const resetSchemeEnv = () => {
     tail: null
   }
   typeSchemeEnv = {
-    head: {}, 
+    head: {},
     tail
   }
 }
 
-export const getSchemeEnv = () : TypeSchemeEnv => {
-  return typeSchemeEnv 
+export const getSchemeEnv = (): TypeSchemeEnv => {
+  return typeSchemeEnv
 }
 
-export const newSchemeVar = () : FunctionType => {
+export const newSchemeVar = (): FunctionType => {
   return {
-    args: [newTypeVar()], 
-    return: newTypeVar() 
+    args: [newTypeVar()],
+    return: newTypeVar()
   }
 }
 
@@ -257,7 +258,7 @@ export const extendSchemeEnv = (vars: string[], schemes: FunctionType[]): TypeSc
   }
   typeSchemeEnv = {
     tail: typeSchemeEnv,
-    head: newFrame,
+    head: newFrame
   }
   return typeSchemeEnv
 }
@@ -305,11 +306,11 @@ const partialEvaluateUnop = (args: any[], op: string) => {
     throw Error(`Partial evaluation of unop expects 1 arg, got ${args.length} arg(s).`)
   }
 
-  if (args[0].tag !== "lit") {
+  if (args[0].tag !== 'lit') {
     return [false, undefined]
   }
 
-  const elem = {type: args[0].type, value: args[0].val}
+  const elem = { type: args[0].type, value: args[0].val }
   return [true, unaryOp(op as es.UnaryOperator, elem)]
 }
 
@@ -319,19 +320,21 @@ const partialEvaluateBinop = (args: any[], op: string) => {
   }
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i].tag !== "lit") {
+    if (args[i].tag !== 'lit') {
       return [false, undefined]
     }
   }
 
-  const left = {type: args[0].type, value: args[0].val}
-  const right = {type: args[1].type, value: args[1].val}
+  const left = { type: args[0].type, value: args[0].val }
+  const right = { type: args[1].type, value: args[1].val }
   return [true, binaryOp(op as es.BinaryOperator, left, right)]
 }
 
 const partialEvaluateCond = (args: any[], pred: any) => {
   if (args.length !== 2) {
-    throw Error(`Partial evaluation of conditional expression expects 2 args, got ${args.length} arg(s).`)
+    throw Error(
+      `Partial evaluation of conditional expression expects 2 args, got ${args.length} arg(s).`
+    )
   }
 
   // unable to pre select branch
@@ -382,7 +385,7 @@ export const typeSchemeCheck = (name: string, args: Array<any>, ret: any) => {
 
 export const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
   if (schemeType.args.length !== givenType.args.length) {
-    return undefined 
+    return undefined
   }
 
   const args = []
@@ -392,7 +395,7 @@ export const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) =
     const givenElem = givenType.args[i]
     const substitued = constrainType(schemeElem, givenElem)
     if (substitued === undefined) {
-      return undefined 
+      return undefined
     }
     args.push(substitued)
   }
@@ -400,7 +403,7 @@ export const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) =
   const resultType = constrainType(schemeType.return, givenType.return)
   if (!resultType) {
     // wrong error msg
-    return undefined 
+    return undefined
   }
 
   return {
@@ -414,6 +417,16 @@ export const unifyReturnType = (annotation: SmlType, actual: SmlType) => {
 
   if (!type) {
     throw new ReturnTypeError(annotation, actual)
+  }
+
+  return type
+}
+
+export const unifyBranches = (cons: SmlType, alt: SmlType) => {
+  const type = constrainType(cons, alt)
+
+  if (!type) {
+    throw new MatchTypeError(cons, alt)
   }
 
   return type
@@ -433,21 +446,21 @@ const isFreeList = (v: SmlType) => isTypedList(v) && v[0] === "'a"
 const isTypedTuple = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'tuple'
 export const isTypedFun = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'fun'
 const isListOrTuple = (v: SmlType) => isTypedList(v) || isTypedTuple(v)
-const isTypeVar = (v: SmlType) => typeOf(v) === 'string' && v[0] === "T"
-export const isFuncType = (v: any) => v.args && v.return 
+const isTypeVar = (v: SmlType) => typeOf(v) === 'string' && v[0] === 'T'
+export const isFuncType = (v: any) => v.args && v.return
 
-export const smlToFuncType = (v: SmlType) : FunctionType => {
-  v = v as Array<SmlType> // we are sure that v is an array 
-  const smlParams = v[0] 
-  const smlRet : SmlType = v[1] 
+export const smlToFuncType = (v: SmlType): FunctionType => {
+  v = v as Array<SmlType> // we are sure that v is an array
+  const smlParams = v[0]
+  const smlRet: SmlType = v[1]
   let args = isTypedTuple(smlParams) ? smlParams.slice(0, -1) : [smlParams]
-  args = (args as Array<SmlType>).map(x => x === undefined ? newTypeVar() : x) 
+  args = (args as Array<SmlType>).map(x => (x === undefined ? newTypeVar() : x))
   const newRet = {
     args,
-    return: smlRet !== undefined ? smlRet : newTypeVar() 
+    return: smlRet !== undefined ? smlRet : newTypeVar()
   }
-  return newRet 
-} 
+  return newRet
+}
 
 const typeOf = (v: Value) => {
   if (v === null) {
@@ -538,13 +551,13 @@ const constrainLiteralType = (scheme: SmlType, given: SmlType) => {
   return scheme
 }
 
-const constrainType = (scheme: SmlType, given: SmlType | undefined) : any => {
+const constrainType = (scheme: SmlType, given: SmlType | undefined): any => {
   if (!given) {
     return scheme
   }
 
   if (isTypeVar(given) || isTypeVar(scheme)) {
-    const toReplace = isTypeVar(given) ? given : scheme 
+    const toReplace = isTypeVar(given) ? given : scheme
     const replacement = isTypeVar(given) ? scheme : given
 
     replaceTypeVar(toReplace as FreeType, replacement)
@@ -559,14 +572,14 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) : any => {
     // recursion
     const result = []
     for (let i = 0; i < scheme.length - 1; i++) {
-      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType) 
+      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
       if (!constrained) {
-        return constrained 
+        return constrained
       }
       result.push(constrained)
     }
     result.push('tuple')
-    return result 
+    return result
   }
 
   if (isFreeLiteral(scheme) || isFreeLiteral(given)) {
@@ -576,14 +589,14 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined) : any => {
   if (isTypedFun(scheme) && isTypedFun(given)) {
     const result = []
     for (let i = 0; i < scheme.length - 1; i++) {
-      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType) 
+      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
       if (!constrained) {
-        return constrained 
+        return constrained
       }
       result.push(constrained)
     }
     result.push('fun')
-    return result 
+    return result
   }
 
   return isStrictEqual(scheme, given) ? scheme : undefined
@@ -602,7 +615,7 @@ export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType =
     if (Array.isArray(currType)) {
       currType.push('list')
     }
-    throw new FunctionTypeError(LIST_SCHEME, {args: [newType, currType], return: newTypeVar()})
+    throw new FunctionTypeError(LIST_SCHEME, { args: [newType, currType], return: newTypeVar() })
   }
 }
 

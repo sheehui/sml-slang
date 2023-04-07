@@ -836,7 +836,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        "The annotated type \"int -> int\" does not match expression's type \"int -> bool\"."
+        'The annotated type "int -> int" does not match expression\'s type "int -> bool".'
       )
     })
   })
@@ -846,7 +846,9 @@ describe('type annotations', () => {
       fun test (x : int) : int = x + 6; test(true);
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("The annotated type \"int\" does not match expression's type \"bool\".")
+      expect(error.explain()).toMatch(
+        'The annotated type "int" does not match expression\'s type "bool".'
+      )
     })
   })
 
@@ -867,7 +869,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        "The annotated type \"int -> bool\" does not match expression's type \"bool -> int\"."
+        'The annotated type "int -> bool" does not match expression\'s type "bool -> int".'
       )
     })
   })
@@ -878,7 +880,7 @@ describe('type annotations', () => {
     `
     return runInContext(code, context, options).catch(error => {
       expect(error.explain()).toMatch(
-        "The annotated type \"(int * int * int)\" does not match expression's type \"(int * int)\"."
+        'The annotated type "(int * int * int)" does not match expression\'s type "(int * int)".'
       )
     })
   })
@@ -1004,7 +1006,9 @@ describe('type annotations', () => {
       val result : string = if (b) then c else a;
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("The annotated type \"string\" does not match expression's type \"int\".")
+      expect(error.explain()).toMatch(
+        'Match rules disagree on type: Cannot merge "string" and "int".'
+      )
     })
   })
 
@@ -1016,7 +1020,7 @@ describe('type annotations', () => {
         else 2;
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch("Expected predicate of type \"bool\", got \"int\".")
+      expect(error.explain()).toMatch('Expected predicate of type "bool", got "int".')
     })
   })
 

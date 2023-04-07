@@ -2,7 +2,12 @@
 import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
-import { CompileTimeSourceError, FunctionTypeError, PredicateTypeError, ReturnTypeError } from '../errors/compileTimeSourceError'
+import {
+  CompileTimeSourceError,
+  FunctionTypeError,
+  PredicateTypeError,
+  ReturnTypeError
+} from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, FunctionType, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
@@ -326,7 +331,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
     const cons = yield* evaluators[node.consequent.type](node.consequent, context)
     const alt = yield* evaluators[node.alternate.type](node.alternate, context)
-    const type = cttc.unifyReturnType(cons.type, alt.type) 
+    const type = cttc.unifyBranches(cons.type, alt.type) 
     const [isEval, res] = cttc.partialEvaluate([cons, alt], pred, 'cond')
 
     return isEval 
@@ -550,7 +555,7 @@ const microcode: { [tag: string]: Function } = {
     }
   },
   lit: (cmd: { val: any; type: SmlType }) => {
-    S.push({type: cmd.type, value: cmd.val})
+    S.push({ type: cmd.type, value: cmd.val })
   },
   id: (cmd: { sym: string }) => {
     let env: Environment | null = E
@@ -789,7 +794,7 @@ export function* evaluate(node: es.Node, context: Context): any {
       // console.log('after stash:')
       // S.print() // print stash
     } else {
-      throw Error("Unsupported microcode tag: " + cmd.tag)
+      throw Error('Unsupported microcode tag: ' + cmd.tag)
     }
     i++
   }
