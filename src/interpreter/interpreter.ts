@@ -2,14 +2,9 @@
 import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
-import {
-  CompileTimeSourceError,
-  FunctionTypeError,
-  PredicateTypeError,
-  ReturnTypeError
-} from '../errors/compileTimeSourceError'
+import { PredicateTypeError } from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
-import { Context, Environment, FunctionType, SmlType, TypedValue, Value } from '../types'
+import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
 import * as cttc from '../utils/cttc'
 import { binaryOp, unaryOp } from '../utils/operators'
@@ -103,15 +98,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       val: node.value === null ? [] : node.value,
       type: cttc.getTypeFromVal(node.value)
     }
-  },
-
-  TemplateLiteral: function* (node: es.TemplateLiteral) {
-    // Expressions like `${1}` are not allowed, so no processing needed
-    return node.quasis[0].value.cooked
-  },
-
-  ThisExpression: function* (node: es.ThisExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
   },
 
   ArrayExpression: function* (node: es.ArrayExpression, context: Context) {
@@ -208,10 +194,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  ArrowFunctionExpression: function* (node: es.ArrowFunctionExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   Identifier: function* (node: es.Identifier, context: Context) {    
     let valType = (node as any).valType
     if (!valType) {
@@ -268,10 +250,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       args,
       type
     }
-  },
-
-  NewExpression: function* (node: es.NewExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
   },
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
@@ -346,10 +324,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  LogicalExpression: function* (node: es.LogicalExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
     // const decl = node.declarations[0]
     // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
@@ -419,31 +393,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  ContinueStatement: function* (_node: es.ContinueStatement, _context: Context) {
-    throw new Error(`not supported yet: ${_node.type}`)
-  },
-
-  BreakStatement: function* (_node: es.BreakStatement, _context: Context) {
-    throw new Error(`not supported yet: ${_node.type}`)
-  },
-
-  ForStatement: function* (node: es.ForStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-
-  AssignmentExpression: function* (node: es.AssignmentExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  FunctionDeclaration: function* (node: es.FunctionDeclaration, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  IfStatement: function* (node: es.IfStatement | es.ConditionalExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   ExpressionStatement: function* (node: es.ExpressionStatement, context: Context) {
     return yield* evaluators[node.expression.type](node.expression, context)
   },
@@ -489,15 +438,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  ReturnStatement: function* (node: es.ReturnStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  WhileStatement: function* (node: es.WhileStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-
   BlockStatement: function* (node: es.BlockStatement, context: Context) {
     const stmts = []; 
     let type = undefined
@@ -525,7 +465,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const progBlk = node.body[0]
     return yield* evaluators[progBlk.type](progBlk, context); 
   }
-  
 }
 
 const microcode: { [tag: string]: Function } = {

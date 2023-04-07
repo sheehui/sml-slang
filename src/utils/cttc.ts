@@ -1,12 +1,11 @@
 import * as es from 'estree'
 
 import {
-  CompileTimeSourceError,
   FunctionTypeError,
   MatchTypeError,
   ReturnTypeError
 } from '../errors/compileTimeSourceError'
-import { ErrorSeverity, ErrorType, FreeType, SmlType, Value } from '../types'
+import { FreeType, SmlType, Value } from '../types'
 import { binaryOp, unaryOp } from './operators'
 
 let typeEnv: TypeEnv = {
