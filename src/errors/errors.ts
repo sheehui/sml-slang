@@ -6,6 +6,7 @@ import * as es from 'estree'
 import { ErrorSeverity, ErrorType, SourceError, Value } from '../types'
 import { stringify } from '../utils/stringify'
 import { RuntimeSourceError } from './runtimeSourceError'
+import { UNKNOWN_LOCATION } from '../constants'
 
 export class InterruptedError extends RuntimeSourceError {
   constructor(node: es.Node) {

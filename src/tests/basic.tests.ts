@@ -123,6 +123,13 @@ describe('binop', () => {
     })
   })
 
+  test('division by 0', () => {
+    const code: string = '20 div 0;'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Div: Unable to evaluate division by zero.')
+    })
+  })
+
   test('divide', () => {
     const code: string = '20 div 3;'
     return runInContext(code, context, options).then(data => {
