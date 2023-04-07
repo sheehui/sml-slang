@@ -53,6 +53,90 @@ let typeSchemeEnv: TypeSchemeEnv = {
   tail: null
 }
 
+const isNumber = (v: Value) => typeOf(v) === 'number'
+const isString = (v: Value) => typeOf(v) === 'string'
+const isBool = (v: Value) => typeOf(v) === 'boolean'
+const isNil = (v: Value) => typeOf(v) === 'null'
+
+const isFreeLiteral = (v: SmlType) => v === "'a"
+const isTypedList = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'list'
+const isFreeList = (v: SmlType) => isTypedList(v) && v[0] === "'a"
+const isTypedTuple = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'tuple'
+export const isTypedFun = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'fun'
+const isListOrTuple = (v: SmlType) => isTypedList(v) || isTypedTuple(v)
+const isTypeVar = (v: SmlType) => typeOf(v) === 'string' && v[0] === 'T'
+export const isFuncType = (v: any) => v.args && v.return
+
+export const smlToFuncType = (v: SmlType): FunctionType => {
+  v = v as Array<SmlType> // we are sure that v is an array
+  const smlParams = v[0]
+  const smlRet: SmlType = v[1]
+  let args = isTypedTuple(smlParams) ? smlParams.slice(0, -1) : [smlParams]
+  args = (args as Array<SmlType>).map(x => (x === undefined ? newTypeVar() : x))
+  const newRet = {
+    args,
+    return: smlRet !== undefined ? smlRet : newTypeVar()
+  }
+  return newRet
+}
+
+const typeOf = (v: Value) => {
+  if (v === null) {
+    return 'null'
+  } else if (v === undefined) {
+    return 'undefined'
+  } else {
+    return typeof v
+  }
+}
+
+const isStrictEqual = (left: SmlType, right: SmlType): boolean => {
+  return left.toString() === right.toString()
+}
+
+const getListDepth = (v: SmlType) => {
+  if (isTypedList(v)) {
+    let depth = 0
+    for (let i = (v as Array<SmlType>).length - 1; i >= 0; i--) {
+      if (v[i] === 'list') {
+        depth++
+      } else {
+        break
+      }
+    }
+    return depth
+  }
+  throw Error('cannot get list depth of non-list type')
+}
+
+export const getTypeFromVal = (val: any): SmlType => {
+  if (isBool(val)) {
+    return 'bool'
+  } else if (isString(val)) {
+    return 'string'
+  } else if (isNumber(val)) {
+    return 'int'
+  } else if (isNil(val)) {
+    return ["'a", 'list']
+  } else {
+    throw Error('Unexpected literal value to type')
+  }
+}
+
+const constructFuncType = (args: Array<any>, ret: any): FunctionType => {
+  const params = []
+
+  for (let j = 0; j < args.length; j++) {
+    const arg = args[j]
+    params.push(arg.tag === 'id' ? findTypeInEnv(arg.sym) : arg.type)
+  }
+
+  return {
+    args: params,
+    return: ret
+  }
+}
+
 /**
  * Type Environment Support
  */
@@ -382,6 +466,10 @@ export const typeSchemeCheck = (name: string, args: Array<any>, ret: any) => {
   return found
 }
 
+/**
+ * Unification Functions
+ */
+
 export const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) => {
   if (schemeType.args.length !== givenType.args.length) {
     return undefined
@@ -429,206 +517,6 @@ export const unifyBranches = (cons: SmlType, alt: SmlType) => {
   }
 
   return type
-}
-
-const isNumber = (v: Value) => typeOf(v) === 'number'
-const isString = (v: Value) => typeOf(v) === 'string'
-const isBool = (v: Value) => typeOf(v) === 'boolean'
-const isNil = (v: Value) => typeOf(v) === 'null'
-
-const isTypedNumber = (v: SmlType) => v === 'int'
-const isTypedString = (v: SmlType) => v === 'string'
-const isTypedBool = (v: SmlType) => v === 'bool'
-const isFreeLiteral = (v: SmlType) => v === "'a"
-const isTypedList = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'list'
-const isFreeList = (v: SmlType) => isTypedList(v) && v[0] === "'a"
-const isTypedTuple = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'tuple'
-export const isTypedFun = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'fun'
-const isListOrTuple = (v: SmlType) => isTypedList(v) || isTypedTuple(v)
-const isTypeVar = (v: SmlType) => typeOf(v) === 'string' && v[0] === 'T'
-export const isFuncType = (v: any) => v.args && v.return
-
-export const smlToFuncType = (v: SmlType): FunctionType => {
-  v = v as Array<SmlType> // we are sure that v is an array
-  const smlParams = v[0]
-  const smlRet: SmlType = v[1]
-  let args = isTypedTuple(smlParams) ? smlParams.slice(0, -1) : [smlParams]
-  args = (args as Array<SmlType>).map(x => (x === undefined ? newTypeVar() : x))
-  const newRet = {
-    args,
-    return: smlRet !== undefined ? smlRet : newTypeVar()
-  }
-  return newRet
-}
-
-const typeOf = (v: Value) => {
-  if (v === null) {
-    return 'null'
-  } else if (v === undefined) {
-    return 'undefined'
-  } else {
-    return typeof v
-  }
-}
-
-const isStrictEqual = (left: SmlType, right: SmlType): boolean => {
-  return left.toString() === right.toString()
-}
-
-const getListDepth = (v: SmlType) => {
-  if (isTypedList(v)) {
-    let depth = 0
-    for (let i = (v as Array<SmlType>).length - 1; i >= 0; i--) {
-      if (v[i] === 'list') {
-        depth++
-      } else {
-        break
-      }
-    }
-    return depth
-  }
-  throw Error('cannot get list depth of non-list type')
-}
-
-export const getTypeFromVal = (val: any): SmlType => {
-  if (isBool(val)) {
-    return 'bool'
-  } else if (isString(val)) {
-    return 'string'
-  } else if (isNumber(val)) {
-    return 'int'
-  } else if (isNil(val)) {
-    return ["'a", 'list']
-  } else {
-    throw Error('Unexpected literal value to type')
-  }
-}
-
-const constructFuncType = (args: Array<any>, ret: any): FunctionType => {
-  const params = []
-
-  for (let j = 0; j < args.length; j++) {
-    const arg = args[j]
-    params.push(arg.tag === 'id' ? findTypeInEnv(arg.sym) : arg.type)
-  }
-
-  return {
-    args: params,
-    return: ret
-  }
-}
-
-const constrainListType = (scheme: SmlType, given: SmlType) => {
-  if (isFreeList(scheme) && isFreeList(given)) {
-    return getListDepth(scheme) <= getListDepth(given) ? given : scheme
-  }
-
-  if (isFreeList(scheme) && !isFreeList(given)) {
-    return getListDepth(scheme) <= getListDepth(given) ? given : undefined
-  }
-
-  if (!isFreeList(scheme) && isFreeList(given)) {
-    return getListDepth(scheme) >= getListDepth(given) ? scheme : undefined
-  }
-
-  if (!isFreeList(scheme) && !isFreeList(given)) {
-    return isStrictEqual(scheme, given) ? scheme : undefined
-  }
-
-  return undefined
-}
-
-const constrainLiteralType = (scheme: SmlType, given: SmlType) => {
-  if (isFreeLiteral(scheme) && !isFreeLiteral(given)) {
-    return given
-  }
-
-  if (isFreeLiteral(given) && !isFreeLiteral(scheme)) {
-    return scheme
-  }
-
-  return scheme
-}
-
-const constrainType = (scheme: SmlType, given: SmlType | undefined): any => {
-  if (!given) {
-    return scheme
-  }
-
-  if (isTypeVar(given) || isTypeVar(scheme)) {
-    const toReplace = isTypeVar(given) ? given : scheme
-    const replacement = isTypeVar(given) ? scheme : given
-
-    replaceTypeVar(toReplace as FreeType, replacement)
-    return replacement
-  }
-
-  if (isTypedList(scheme) && isTypedList(given)) {
-    return constrainListType(scheme, given)
-  }
-
-  if (isTypedTuple(scheme) && isTypedTuple(given)) {
-    // recursion
-    const result = []
-    for (let i = 0; i < scheme.length - 1; i++) {
-      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
-      if (!constrained) {
-        return constrained
-      }
-      result.push(constrained)
-    }
-    result.push('tuple')
-    return result
-  }
-
-  if (isFreeLiteral(scheme) || isFreeLiteral(given)) {
-    return constrainLiteralType(scheme, given)
-  }
-
-  if (isTypedFun(scheme) && isTypedFun(given)) {
-    const result = []
-    for (let i = 0; i < scheme.length - 1; i++) {
-      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
-      if (!constrained) {
-        return constrained
-      }
-      result.push(constrained)
-    }
-    result.push('fun')
-    return result
-  }
-
-  return isStrictEqual(scheme, given) ? scheme : undefined
-}
-
-export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType => {
-  if (constrainType(currType, newType)) {
-    return isFreeList(currType)
-      ? isFreeList(newType)
-        ? getListDepth(currType) >= getListDepth(newType)
-          ? currType
-          : newType
-        : newType
-      : currType
-  } else {
-    if (Array.isArray(currType)) {
-      currType.push('list')
-    }
-    throw new FunctionTypeError(LIST_SCHEME, { args: [newType, currType], return: newTypeVar() })
-  }
-}
-
-export const getDeclaredListType = (first: SmlType | undefined): SmlType => {
-  if (first === undefined) {
-    return ["'a", 'list']
-  } else {
-    const typeArr = isTypedList(first) ? first : [first]
-    if (!Array.isArray(typeArr)) {
-      throw Error('Cannot push to a non array type.')
-    }
-
-    return typeArr.concat(['list'])
-  }
 }
 
 function unifyListOp(op: '::' | '@', args: any[]) {
@@ -707,4 +595,120 @@ function unifyListAppend(left: SmlType[], right: SmlType[]) {
     }
   }
   return
+}
+
+export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType => {
+  if (constrainType(currType, newType)) {
+    return isFreeList(currType)
+      ? isFreeList(newType)
+        ? getListDepth(currType) >= getListDepth(newType)
+          ? currType
+          : newType
+        : newType
+      : currType
+  } else {
+    if (Array.isArray(currType)) {
+      currType.push('list')
+    }
+    throw new FunctionTypeError(LIST_SCHEME, { args: [newType, currType], return: newTypeVar() })
+  }
+}
+
+/**
+ * Constrain Functions
+ */
+
+const constrainType = (scheme: SmlType, given: SmlType | undefined): any => {
+  if (!given) {
+    return scheme
+  }
+
+  if (isTypeVar(given) || isTypeVar(scheme)) {
+    const toReplace = isTypeVar(given) ? given : scheme
+    const replacement = isTypeVar(given) ? scheme : given
+
+    replaceTypeVar(toReplace as FreeType, replacement)
+    return replacement
+  }
+
+  if (isTypedList(scheme) && isTypedList(given)) {
+    return constrainListType(scheme, given)
+  }
+
+  if (isTypedTuple(scheme) && isTypedTuple(given)) {
+    const result = []
+    for (let i = 0; i < scheme.length - 1; i++) {
+      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
+      if (!constrained) {
+        return undefined
+      }
+      result.push(constrained)
+    }
+    result.push('tuple')
+    return result
+  }
+
+  if (isFreeLiteral(scheme) || isFreeLiteral(given)) {
+    return constrainLiteralType(scheme, given)
+  }
+
+  if (isTypedFun(scheme) && isTypedFun(given)) {
+    const result = []
+    for (let i = 0; i < scheme.length - 1; i++) {
+      const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
+      if (!constrained) {
+        return constrained
+      }
+      result.push(constrained)
+    }
+    result.push('fun')
+    return result
+  }
+
+  return isStrictEqual(scheme, given) ? scheme : undefined
+}
+
+const constrainListType = (scheme: SmlType, given: SmlType) => {
+  if (isFreeList(scheme) && isFreeList(given)) {
+    return getListDepth(scheme) <= getListDepth(given) ? given : scheme
+  }
+
+  if (isFreeList(scheme) && !isFreeList(given)) {
+    return getListDepth(scheme) <= getListDepth(given) ? given : undefined
+  }
+
+  if (!isFreeList(scheme) && isFreeList(given)) {
+    return getListDepth(scheme) >= getListDepth(given) ? scheme : undefined
+  }
+
+  if (!isFreeList(scheme) && !isFreeList(given)) {
+    return isStrictEqual(scheme, given) ? scheme : undefined
+  }
+
+  return undefined
+}
+
+const constrainLiteralType = (scheme: SmlType, given: SmlType) => {
+  if (isFreeLiteral(scheme) && !isFreeLiteral(given)) {
+    return given
+  }
+
+  if (isFreeLiteral(given) && !isFreeLiteral(scheme)) {
+    return scheme
+  }
+
+  return scheme
+}
+
+export const getDeclaredListType = (first: SmlType | undefined): SmlType => {
+  if (first === undefined) {
+    return ["'a", 'list']
+  } else {
+    const typeArr = isTypedList(first) ? first : [first]
+    if (!Array.isArray(typeArr)) {
+      throw Error('Cannot push to a non array type.')
+    }
+
+    return typeArr.concat(['list'])
+  }
 }
