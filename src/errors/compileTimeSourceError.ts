@@ -66,6 +66,25 @@ export class ReturnTypeError extends CompileTimeSourceError {
   }
 }
 
+export class PredicateTypeError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
+
+  constructor(public got: SmlType) {
+    super()
+    this.got = got
+  }
+
+  public explain() {
+    return `Expected predicate of type "bool", got "${smlTypeToString(this.got)}".`
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
 const functionTypeToString = (type: FunctionType): string => {
   let result = ''
 

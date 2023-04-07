@@ -2,7 +2,7 @@
 import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
-import { CompileTimeSourceError, FunctionTypeError, ReturnTypeError } from '../errors/compileTimeSourceError'
+import { CompileTimeSourceError, FunctionTypeError, PredicateTypeError, ReturnTypeError } from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, FunctionType, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
@@ -272,7 +272,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
     const type = cttc.typeSchemeCheck(node.operator, [arg], undefined)
-    const [isEval, res] = cttc.partialEvaluate([arg], node.operator)
+    const [isEval, res] = cttc.partialEvaluate([arg], node.operator, 'unop')
 
     return isEval ? {
       tag: 'lit',
@@ -291,7 +291,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const scnd = yield* evaluators[node.right.type](node.right, context)
     const frst = yield* evaluators[node.left.type](node.left, context)
     const type = cttc.typeSchemeCheck(node.operator, [frst, scnd], undefined)
-    const [isEval, res] = cttc.partialEvaluate([frst, scnd], node.operator)
+    const [isEval, res] = cttc.partialEvaluate([frst, scnd], node.operator, 'binop')
 
     return isEval ? {
       tag: 'lit',
@@ -322,13 +322,16 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
     const pred = yield* evaluators[node.test.type](node.test, context)
     if (pred.type !== 'bool') {
-      throw new rttc.TypeError(node, " as predicate", 'boolean', pred.type)
+      throw new PredicateTypeError(pred.type)
     }
     const cons = yield* evaluators[node.consequent.type](node.consequent, context)
     const alt = yield* evaluators[node.alternate.type](node.alternate, context)
     const type = cttc.unifyReturnType(cons.type, alt.type) 
+    const [isEval, res] = cttc.partialEvaluate([cons, alt], pred, 'cond')
 
-    return {
+    return isEval 
+    ? res 
+    : {
       tag: 'cond_expr', 
       pred,
       cons,

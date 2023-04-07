@@ -286,9 +286,36 @@ export const findSchemeInEnv = (vars: string): FunctionType | Array<FunctionType
 /**
  * Partial Evaluation
  */
-export const partialEvaluate = (args: any[], op: string) => {
-  if (args.length > 2) {
-    throw Error(`Unsupported number of args for partial evaluation, expect unop or binop got ${args.length}.`)
+
+export const partialEvaluate = (args: any[], op: any, expr: 'binop' | 'unop' | 'cond') => {
+  switch (expr) {
+    case 'binop':
+      return partialEvaluateBinop(args, op)
+    case 'unop':
+      return partialEvaluateUnop(args, op)
+    case 'cond':
+      return partialEvaluateCond(args, op)
+    default:
+      return [false, undefined]
+  }
+}
+
+const partialEvaluateUnop = (args: any[], op: string) => {
+  if (args.length !== 1) {
+    throw Error(`Partial evaluation of unop expects 1 arg, got ${args.length} arg(s).`)
+  }
+
+  if (args[0].tag !== "lit") {
+    return [false, undefined]
+  }
+
+  const elem = {type: args[0].type, value: args[0].val}
+  return [true, unaryOp(op as es.UnaryOperator, elem)]
+}
+
+const partialEvaluateBinop = (args: any[], op: string) => {
+  if (args.length !== 2) {
+    throw Error(`Partial evaluation of unop expects 2 args, got ${args.length} arg(s).`)
   }
 
   for (let i = 0; i < args.length; i++) {
@@ -297,17 +324,26 @@ export const partialEvaluate = (args: any[], op: string) => {
     }
   }
 
-  if (args.length == 1) {
-    const elem = {type: args[0].type, value: args[0].val}
-    return [true, unaryOp(op as es.UnaryOperator, elem)]
+  const left = {type: args[0].type, value: args[0].val}
+  const right = {type: args[1].type, value: args[1].val}
+  return [true, binaryOp(op as es.BinaryOperator, left, right)]
+}
+
+const partialEvaluateCond = (args: any[], pred: any) => {
+  if (args.length !== 2) {
+    throw Error(`Partial evaluation of conditional expression expects 2 args, got ${args.length} arg(s).`)
   }
 
-  if (args.length == 2) {
-    const left = {type: args[0].type, value: args[0].val}
-    const right = {type: args[1].type, value: args[1].val}
-    return [true, binaryOp(op as es.BinaryOperator, left, right)]
+  // unable to pre select branch
+  if (pred.tag != 'lit') {
+    return [false, undefined]
   }
-  return [false, undefined]
+
+  if (pred.val) {
+    return [true, args[0]]
+  } else {
+    return [true, args[1]]
+  }
 }
 
 /**

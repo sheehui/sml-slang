@@ -1016,7 +1016,7 @@ describe('type annotations', () => {
         else 2;
     `
     return runInContext(code, context, options).catch(error => {
-      expect(error.explain()).toMatch('Expected boolean as predicate, got int.')
+      expect(error.explain()).toMatch("Expected predicate of type \"bool\", got \"int\".")
     })
   })
 
