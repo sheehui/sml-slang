@@ -681,8 +681,10 @@ const microcode: { [tag: string]: Function } = {
     }
     const func = S.pop()
 
-    // TODO: Implement tail call
-    A.push({ tag: 'env_i', env: E })
+    // tail call
+    if (A.size() !== 0 && A.peek().tag !== 'env_i') {
+      A.push({ tag: 'env_i', env: E })
+    }
 
     A.push(func.body)
     // set E to the function env, extended with params and args
