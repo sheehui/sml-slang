@@ -8,7 +8,6 @@ import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
 import * as cttc from '../utils/cttc'
 import { binaryOp, unaryOp } from '../utils/operators'
-import * as rttc from '../utils/rttc'
 
 const step_limit = 10000
 let A = new Stack<any>()
@@ -665,14 +664,14 @@ const microcode: { [tag: string]: Function } = {
     for (let i = 0; i < cmd.len; i++) {
       const elem = S.pop()
       tuple.push(elem.value)
-      type.push(rttc.getElemType(elem))
+      type.push(elem.type)
     }
     type.push('tuple')
     S.push({ type: type, value: tuple })
   },
   record_i: (cmd: { index: number; node: es.MemberExpression }) => {
     const tuple = S.pop()
-    S.push(rttc.getTypedTupleElem(cmd.node, tuple, cmd.index))
+    S.push({type: tuple.type[cmd.index], value: tuple.value[cmd.index]})
   },
   app_i: (cmd: { arity: number; isCheck: boolean }) => {
     const args = []
