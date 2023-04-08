@@ -1,6 +1,6 @@
-# sml-slang
+# SML Slang
 
-Sub language of Standard ML.
+Sub language of Standard ML
 
 ## Possible Issues (and manual solutions)
 
@@ -26,6 +26,7 @@ First, build and link your local sml-slang:
 
 ```{.}
 $ cd sml-slang
+$ yarn
 $ yarn build
 $ yarn link
 ```
