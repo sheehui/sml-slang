@@ -2,6 +2,11 @@
 
 Sub language of Standard ML.
 
+## Possible Issues (and manual solutions)
+
+* `node` should be replaced by `node.exe` if you are using WSL with node.js installed on your Windows, you can update relevant scripts used in `package.json`.
+* In case you meet the same error as [this](https://github.com/jiangmiao/node-getopt/issues/20) when using *node-getopt*, modify the `package.json` of node-getopt as [this PR](https://github.com/jiangmiao/node-getopt/pull/21/commits/05e498731c14b648fa332ca78d3a301c5e4be440) shows.
+
 # Table of Contents
 
 - [Requirements](#requirements)
