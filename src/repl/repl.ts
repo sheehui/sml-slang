@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { start } from 'repl' // 'repl' here refers to the module named 'repl' in index.d.ts
-import { inspect } from 'util'
 
 import { sourceLanguages } from '../constants'
+import { CompileTimeSourceError } from '../errors/compileTimeSourceError'
+import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { createContext, IOptions, parseError, runInContext } from '../index'
 import { ExecutionMethod, Variant } from '../types'
+import { smlTypedValToString, smlTypeToString } from '../utils/formatters'
 
 function startRepl(
   executionMethod: ExecutionMethod = 'interpreter',
@@ -37,17 +39,16 @@ function startRepl(
               } else {
                 callback(new Error(parseError(context.errors)), undefined)
               }
+            }, error => {
+              if (error instanceof RuntimeSourceError || error instanceof CompileTimeSourceError) {
+                console.error(error.explain())
+              } else {
+                console.error(error.message)
+              }
             })
           },
-          // set depth to a large number so that `parse()` output will not be folded,
-          // setting to null also solves the problem, however a reference loop might crash
           writer: output => {
-            return typeof output === 'function'
-              ? output.toString()
-              : inspect(output, {
-                  depth: 1000,
-                  colors: true
-                })
+            return `${smlTypedValToString(output)} : ${smlTypeToString(output.type)}`
           }
         }
       )

@@ -3,6 +3,7 @@ import * as es from 'estree'
 import { UNKNOWN_LOCATION } from '../constants'
 import { ErrorSeverity, ErrorType, SmlType, SourceError } from '../types'
 import { FunctionType } from '../utils/cttc'
+import { argToString, functionTypeToString, smlTypeToString } from '../utils/formatters'
 
 export class CompileTimeSourceError implements SourceError {
   public type = ErrorType.COMPILE_TIME
@@ -104,80 +105,5 @@ export class MatchTypeError extends CompileTimeSourceError {
 
   public elaborate() {
     return this.explain()
-  }
-}
-
-const functionTypeToString = (type: FunctionType): string => {
-  let result = ''
-
-  for (let i = 0; i < type.args.length; i++) {
-    const element = type.args[i]
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
-  }
-
-  result += ' -> '
-
-  result += smlTypeToString(type.return) // abit sus
-
-  return result
-}
-
-const argToString = (type: FunctionType): string => {
-  let result = ''
-
-  for (let i = 0; i < type.args.length; i++) {
-    const element = type.args[i]
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
-  }
-
-  return result
-}
-
-export const smlTypeToString = (type: SmlType): string => {
-  const isTypeArr = Array.isArray(type)
-  if (isTypeArr && type[type.length - 1] == 'list') {
-    let str = ''
-
-    type.forEach((element: SmlType | Array<SmlType>) => {
-      if (Array.isArray(element)) {
-        str += ' ' + smlTypeToString(element)
-      } else {
-        str += ' ' + element
-      }
-    })
-
-    return str.trim()
-  } else if (isTypeArr && type[type.length - 1] == 'tuple') {
-    let str = '('
-
-    for (let i = 0; i < type.length - 1; i++) {
-      const element = type[i]
-      if (i !== 0) {
-        str += ' * '
-      }
-      if (Array.isArray(element)) {
-        str += smlTypeToString(element)
-      } else {
-        str += element
-      }
-    }
-    str += ')'
-
-    return str
-  } else if (isTypeArr && type[type.length - 1] == 'fun') {
-    const paramsType = Array.isArray(type[0]) ? smlTypeToString(type[0]) : type[0]
-    const retType = Array.isArray(type[1]) ? smlTypeToString(type[1]) : type[1]
-
-    return `${paramsType} -> ${retType}`
-  } else {
-    return type.toString()
   }
 }

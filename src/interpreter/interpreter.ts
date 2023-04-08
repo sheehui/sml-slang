@@ -717,14 +717,14 @@ export function* evaluate(node: es.Node, context: Context): any {
   E = createGlobalEnvironment()
   cttc.resetTypeEnv()
   cttc.resetSchemeEnv()
-  console.log('=====START EVALUATION=====')
+  // console.log('=====START EVALUATION=====')
   A.push(yield* evaluators[node.type](node, context))
   let i = 0
   while (i < step_limit) {
     if (A.size() === 0) break
     const cmd = A.pop()
-    console.log('\n=====instruction====')
-    console.log(cmd)
+    // console.log('\n=====instruction====')
+    // console.log(cmd)
     // console.log("\n=====agenda====")
     // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
@@ -741,10 +741,10 @@ export function* evaluate(node: es.Node, context: Context): any {
 
   // const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
-  console.log('\n=====EXIT EVALUATION=====\n')
+  // console.log('\n=====EXIT EVALUATION=====\n')
   const r = S.pop()
-  console.log(r)
-  console.log(cttc.getTypeEnv().head)
-  console.log(cttc.getSchemeEnv().head)
+  // console.log(r)
+  // console.log(cttc.getTypeEnv().head)
+  // console.log(cttc.getSchemeEnv().head)
   return r
 }
