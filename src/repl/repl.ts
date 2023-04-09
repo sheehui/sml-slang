@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 import { start } from 'repl' // 'repl' here refers to the module named 'repl' in index.d.ts
-import { inspect } from 'util'
 
 import { sourceLanguages } from '../constants'
 import { CompileTimeSourceError } from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { createContext, IOptions, parseError, runInContext } from '../index'
-import { ExecutionMethod, TypedValue,Variant } from '../types'
+import { ExecutionMethod,Variant } from '../types'
 import { smlTypedValToString, smlTypeToString } from '../utils/formatters'
 
 function startRepl(
@@ -32,8 +31,7 @@ function startRepl(
       }
       start(
         // the object being passed as argument fits the interface ReplOptions in the repl module.
-        { useColors: true,
-          eval: (cmd, unusedContext, unusedFilename, callback) => {
+        { eval: (cmd, unusedContext, unusedFilename, callback) => {
             runInContext(cmd, context, options).then(obj => {
               if (obj.status === 'finished' || obj.status === 'suspended-non-det') {
                 callback(null, obj.value)
@@ -42,18 +40,22 @@ function startRepl(
               }
             }, error => {
               if (error instanceof RuntimeSourceError || error instanceof CompileTimeSourceError) {
-                // console.log('\x1b[31m%s\x1b[0m', error.explain())
-                callback(new Error(error.explain()), undefined)
+                callback(null, new Error(error.explain()))
               } else {
-                // console.log('\x1b[31m%s\x1b[0m', error.message)
-                callback(error, undefined)
+                callback(null, new Error(error.message))
               }
             })
           },
           writer: output => {
-            return output.hasOwnProperty('type') && output.hasOwnProperty('value')
-              ? `${smlTypedValToString(output)} : ${smlTypeToString(output.type)}`
-              : output.message
+            try {
+              if (output.hasOwnProperty('type') && output.hasOwnProperty('value')) {
+                return `\x1b[32m${smlTypedValToString(output)} : ${smlTypeToString(output.type)}\x1b[0m`
+              } else {
+                throw output
+              }
+            } catch (error) {
+              return `\x1b[31m${error.message}\x1b[0m`
+            }
           }
         }
       )
