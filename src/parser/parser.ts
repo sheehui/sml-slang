@@ -448,12 +448,15 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
     const init = new ExpressionGenerator().visit(ctx._value) // variable value
     const pat: es.Pattern[] = new PatternGenerator().visit(ctx._identifier)
+    let id = pat[0]
 
     if (pat.length > 1) {
       // pattern matching
-      throw Error('not supported yet')
+      id = {
+        type: "ArrayPattern", 
+        elements: pat
+      }
     }
-    const id = pat[0]
 
     if (ctx.REC() && init.type === 'FunctionExpression' && id.type === 'Identifier') {
       // 'rec' can only be specified for lambdas

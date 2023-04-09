@@ -2,7 +2,7 @@
 import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
-import { PredicateTypeError } from '../errors/compileTimeSourceError'
+import { PatternLenMatchError, PatternMatchError, PredicateTypeError } from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
@@ -195,6 +195,13 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   Identifier: function* (node: es.Identifier, context: Context) {    
     let valType = (node as any).valType
+    if (node.name === '_') {
+      return {
+        tag: 'id', 
+        sym: node.name,
+        type: valType ? valType : cttc.newTypeVar() 
+      }
+    }
     if (!valType) {
       valType = cttc.isInTypeEnv(node.name) 
         ? cttc.findTypeInEnv(node.name) 
@@ -324,8 +331,12 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
-    // const decl = node.declarations[0]
-    // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+    function initIdType(exprType: SmlType, id: string) {
+      cttc.isTypedFun(exprType) 
+        ? cttc.addToSchemeFrame(id, cttc.newSchemeVar()) 
+        : cttc.addToTypeFrame(id, cttc.newTypeVar()) 
+    }
+
     const ids = [] 
     const exprs = []
     let localStartIdx = null 
@@ -350,19 +361,37 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
         while (i < end) {
           const decl = node.declarations[i]
           const expr = yield* evaluators[decl.init!.type](decl.init!, context)
-          cttc.isTypedFun(expr.type)
-            ? cttc.addToSchemeFrame((decl.id as any).name, cttc.newSchemeVar()) 
-            : cttc.addToTypeFrame((decl.id as any).name, cttc.newTypeVar()) 
-          
-          const id = yield* evaluators[decl.id.type](decl.id, context)
-          const type = cttc.unifyReturnType(id.type, expr.type) 
-          cttc.addToTypeFrame(id.sym, type, 1)
-          
-          ids.push(id)
+          if (decl.id.type === "ArrayPattern" && cttc.isTypedTuple(expr.type)) {
+            if (decl.id.elements.length !== expr.type.length - 1) {
+              throw new PatternLenMatchError(decl.id.elements.length, expr.type.length - 1)
+            }
+            const idTupElems = []
+            for (let i = 0; i < decl.id.elements.length; i++) {
+              const currExprType = expr.type[i]
+              const elem = decl.id.elements[i]
+              if (!elem) break 
+              const sym = (elem as any).name
+              sym !== "_" && initIdType(currExprType, sym)
+
+              const id = yield* evaluators[elem.type](elem, context)
+              const type = cttc.unifyReturnType(id.type, currExprType)
+              sym !== "_" && cttc.addToTypeFrame(id.sym, type, 1)
+              idTupElems.push(id) 
+            }
+            ids.push(idTupElems)
+          } else if (decl.id.type === "Identifier") {
+            initIdType(expr.type, (decl.id as any).name)
+            const id = yield* evaluators[decl.id.type](decl.id, context)
+            const type = cttc.unifyReturnType(id.type, expr.type) 
+            cttc.addToTypeFrame(id.sym, type, 1) 
+            
+            ids.push(id)
+          } else {
+            throw new PatternMatchError(expr.type)
+          }
           exprs.push(expr)
           i++  
         }
-
         cttc.restoreTypeEnv(initEnv)
         cttc.restoreSchemeEnv(initSchemeEnv)
         i-- 
@@ -370,15 +399,34 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       }
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
-      cttc.isTypedFun(expr.type)
-        ? cttc.addToSchemeFrame((decl.id as any).name, cttc.newSchemeVar()) 
-        : cttc.addToTypeFrame((decl.id as any).name, cttc.newTypeVar()) 
-      
-      const id = yield* evaluators[decl.id.type](decl.id, context)
-      const type = cttc.unifyReturnType(id.type, expr.type) 
-      cttc.addToTypeFrame(id.sym, type) 
-      
-      ids.push(id)
+      if (decl.id.type === "ArrayPattern" && cttc.isTypedTuple(expr.type)) {
+        if (decl.id.elements.length !== expr.type.length - 1) {
+          throw new PatternLenMatchError(decl.id.elements.length, expr.type.length - 1)
+        }
+        const idTupElems = []
+        for (let i = 0; i < decl.id.elements.length; i++) {
+          const currExprType = expr.type[i]
+          const elem = decl.id.elements[i]
+          if (!elem) break 
+          const sym = (elem as any).name
+          sym !== "_" && initIdType(currExprType, sym)
+
+          const id = yield* evaluators[elem.type](elem, context)
+          const type = cttc.unifyReturnType(id.type, currExprType)
+          sym !== "_" && cttc.addToTypeFrame(id.sym, type)
+          idTupElems.push(id) 
+        }
+        ids.push(idTupElems)
+      } else if (decl.id.type === "Identifier") {
+        initIdType(expr.type, (decl.id as any).name)
+        const id = yield* evaluators[decl.id.type](decl.id, context)
+        const type = cttc.unifyReturnType(id.type, expr.type) 
+        cttc.addToTypeFrame(id.sym, type) 
+        
+        ids.push(id)
+      } else {
+        throw new PatternMatchError(expr.type)
+      }
       exprs.push(expr)
     }
 
@@ -634,10 +682,22 @@ const microcode: { [tag: string]: Function } = {
   },
   assmt_i: (cmd: { id: any; frameOffset: number }) => {
     const val = S.peek()
-    if (cmd.frameOffset && E.tail) {
-      return (E.tail.head[cmd.id.sym] = val)
+    if (Array.isArray(cmd.id)) {
+      for (let i = 0; i < val.value.length; i++) {
+        const curr = cmd.id[i]
+        if (curr.sym === "_") continue
+        if (cmd.frameOffset && E.tail) {
+          E.tail.head[curr.sym] = val.value[i]
+          continue
+        }
+        E.head[curr.sym] = { value: val.value[i], type: val.type[i] }
+      }
+    } else {
+      if (cmd.frameOffset && E.tail) {
+        return (E.tail.head[cmd.id.sym] = val)
+      }
+      E.head[cmd.id.sym] = val
     }
-    E.head[cmd.id.sym] = val
   },
   list_lit_i: (cmd: { len: number; node: es.ArrayExpression; type: SmlType }) => {
     const list = []
@@ -680,7 +740,7 @@ const microcode: { [tag: string]: Function } = {
     for (let i = 0; i < cmd.arity; i++) {
       args.push(S.pop())
     }
-    const func = S.pop()
+    const func = S.pop().value
 
     // tail call
     if (A.size() !== 0 && A.peek().tag !== 'env_i') {
@@ -705,7 +765,8 @@ const microcode: { [tag: string]: Function } = {
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
   closure_i: (cmd: { params: any[]; body: any; env: Environment; type: SmlType }) => {
-    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env, type: cmd.type })
+    const value = { tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env, type: cmd.type }
+    S.push({ type: cmd.type, value })
   },
   pop_i: () => {
     S.pop()
@@ -745,7 +806,7 @@ export function* evaluate(node: es.Node, context: Context): any {
   yield* leave(context)
   // console.log('\n=====EXIT EVALUATION=====\n')
   const r = S.pop()
-  // console.log(r)
+  console.log(r)
   // console.log(cttc.getTypeEnv().head)
   // console.log(cttc.getSchemeEnv().head)
   return r

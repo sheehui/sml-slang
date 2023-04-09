@@ -61,7 +61,7 @@ const isNil = (v: Value) => typeOf(v) === 'null'
 const isFreeLiteral = (v: SmlType) => v === "'a"
 const isTypedList = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'list'
 const isFreeList = (v: SmlType) => isTypedList(v) && v[0] === "'a"
-const isTypedTuple = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'tuple'
+export const isTypedTuple = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'tuple'
 export const isTypedFun = (v: SmlType) => Array.isArray(v) && v[v.length - 1] === 'fun'
 const isListOrTuple = (v: SmlType) => isTypedList(v) || isTypedTuple(v)
 const isTypeVar = (v: SmlType) => typeOf(v) === 'string' && v[0] === 'T'

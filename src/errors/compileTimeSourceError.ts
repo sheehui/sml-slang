@@ -107,3 +107,42 @@ export class MatchTypeError extends CompileTimeSourceError {
     return this.explain()
   }
 }
+
+export class PatternMatchError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
+
+  constructor(public got: SmlType) {
+    super()
+    this.got = got
+  }
+
+  public explain() {
+    return `Expected pattern of record type, got "${smlTypeToString(this.got)}".`
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class PatternLenMatchError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
+
+  constructor(public expected: number, public got: number) {
+    super()
+    this.expected = expected
+    this.got = got
+  }
+
+  public explain() {
+    return `Expected a record type with ${this.expected} entries, but the given record has ${this.got} entries.`
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
