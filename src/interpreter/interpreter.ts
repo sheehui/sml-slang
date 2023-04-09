@@ -461,8 +461,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Program: function* (node: es.BlockStatement, context: Context) {
-    const progBlk = node.body[0]
-    return yield* evaluators[progBlk.type](progBlk, context); 
+    const progBlk = node.body[0] as es.BlockStatement
+    if (progBlk.body.length !== 0) {
+      return yield* evaluators[progBlk.type](progBlk, context); 
+    }
   }
 }
 
@@ -734,7 +736,7 @@ export function* evaluate(node: es.Node, context: Context): any {
       // console.log('after stash:')
       // S.print() // print stash
     } else {
-      throw Error('Unsupported microcode tag: ' + cmd.tag)
+      // throw Error('Bad command')
     }
     i++
   }

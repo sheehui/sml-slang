@@ -42,12 +42,15 @@ function startRepl(
               if (error instanceof RuntimeSourceError || error instanceof CompileTimeSourceError) {
                 callback(null, new Error(error.explain()))
               } else {
-                callback(null, new Error(error.message))
+                callback(null, error)
               }
             })
           },
           writer: output => {
             try {
+              if (!output) {
+                return '>'
+              }
               if (output.hasOwnProperty('type') && output.hasOwnProperty('value')) {
                 return `\x1b[32m${smlTypedValToString(output)} : ${smlTypeToString(output.type)}\x1b[0m`
               } else {
