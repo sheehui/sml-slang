@@ -60,7 +60,7 @@ $ yarn build
 To try out _SML Slang_ in a REPL, run
 
 ```{.}
-$ yarn repl
+$ yarn repl ''
 ```
 
 You can set additional options:
