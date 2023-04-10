@@ -5,7 +5,7 @@ import { sourceLanguages } from '../constants'
 import { CompileTimeSourceError } from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { createContext, IOptions, parseError, runInContext } from '../index'
-import { ExecutionMethod,Variant } from '../types'
+import { ExecutionMethod, Variant } from '../types'
 import { smlTypedValToString, smlTypeToString } from '../utils/formatters'
 
 function startRepl(
@@ -21,7 +21,7 @@ function startRepl(
     scheduler: 'preemptive',
     executionMethod,
     variant,
-    useSubst,
+    useSubst
   }
   runInContext(prelude, context, options).then(preludeResult => {
     if (preludeResult.status === 'finished' || preludeResult.status === 'suspended-non-det') {
@@ -31,28 +31,50 @@ function startRepl(
       }
       start(
         // the object being passed as argument fits the interface ReplOptions in the repl module.
-        { eval: (cmd, unusedContext, unusedFilename, callback) => {
-            runInContext(cmd, context, options).then(obj => {
-              if (obj.status === 'finished' || obj.status === 'suspended-non-det') {
-                callback(null, obj.value)
-              } else {
-                callback(new Error(parseError(context.errors)), undefined)
+        {
+          eval: (cmd, unusedContext, unusedFilename, callback) => {
+            runInContext(cmd, context, options).then(
+              obj => {
+                if (obj.status === 'finished' || obj.status === 'suspended-non-det') {
+                  callback(null, obj.value)
+                } else {
+                  callback(new Error(parseError(context.errors)), undefined)
+                }
+              },
+              error => {
+                if (
+                  error instanceof RuntimeSourceError ||
+                  error instanceof CompileTimeSourceError
+                ) {
+                  callback(null, new Error(error.explain()))
+                } else {
+                  callback(null, error)
+                }
               }
-            }, error => {
-              if (error instanceof RuntimeSourceError || error instanceof CompileTimeSourceError) {
-                callback(null, new Error(error.explain()))
-              } else {
-                callback(null, error)
-              }
-            })
+            )
           },
           writer: output => {
             try {
               if (!output) {
                 return '>'
               }
+              if (Array.isArray(output)) {
+                if (output.length === 0) {
+                  return '(no output)'
+                }
+                let res = '\x1b[32m'
+                for (let i = 0; i < output.length; i++) {
+                  if (i !== 0) {
+                    res += '\n'
+                  }
+                  res += `${smlTypedValToString(output[i])} : ${smlTypeToString(output[i].type)}`
+                }
+                return res + '\x1b[0m'
+              }
               if (output.hasOwnProperty('type') && output.hasOwnProperty('value')) {
-                return `\x1b[32m${smlTypedValToString(output)} : ${smlTypeToString(output.type)}\x1b[0m`
+                return `\x1b[32m${smlTypedValToString(output)} : ${smlTypeToString(
+                  output.type
+                )}\x1b[0m`
               } else {
                 throw output
               }

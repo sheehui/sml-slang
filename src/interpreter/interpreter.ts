@@ -2,7 +2,11 @@
 import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
-import { PatternLenMatchError, PatternMatchError, PredicateTypeError } from '../errors/compileTimeSourceError'
+import {
+  PatternLenMatchError,
+  PatternMatchError,
+  PredicateTypeError
+} from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
@@ -700,20 +704,29 @@ const microcode: { [tag: string]: Function } = {
   assmt_i: (cmd: { id: any; frameOffset: number }) => {
     const val = S.peek()
     if (Array.isArray(cmd.id)) {
+      S.pop()
+      const patt = []
       for (let i = 0; i < val.value.length; i++) {
         const curr = cmd.id[i]
-        if (curr.sym === "_") continue
+        if (curr.sym === '_') continue
         if (cmd.frameOffset && E.tail) {
           E.tail.head[curr.sym] = val.value[i]
           continue
         }
         E.head[curr.sym] = { value: val.value[i], type: val.type[i] }
+        patt.push({ value: val.value[i], type: val.type[i] })
       }
+      S.push(patt)
     } else {
       if (cmd.frameOffset && E.tail) {
         return (E.tail.head[cmd.id.sym] = val)
       }
-      E.head[cmd.id.sym] = val
+      if (cmd.id.sym === '_') {
+        S.pop()
+        S.push([])
+      } else {
+        E.head[cmd.id.sym] = val
+      }
     }
   },
   list_lit_i: (cmd: { len: number; node: es.ArrayExpression; type: SmlType }) => {
@@ -750,7 +763,7 @@ const microcode: { [tag: string]: Function } = {
   },
   record_i: (cmd: { index: number; node: es.MemberExpression }) => {
     const tuple = S.pop()
-    S.push({type: tuple.type[cmd.index], value: tuple.value[cmd.index]})
+    S.push({ type: tuple.type[cmd.index], value: tuple.value[cmd.index] })
   },
   app_i: (cmd: { arity: number; isCheck: boolean }) => {
     const args = []
@@ -782,7 +795,13 @@ const microcode: { [tag: string]: Function } = {
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
   closure_i: (cmd: { params: any[]; body: any; env: Environment; type: SmlType }) => {
-    const value = { tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env, type: cmd.type }
+    const value = {
+      tag: 'closure',
+      params: cmd.params,
+      body: cmd.body,
+      env: cmd.env,
+      type: cmd.type
+    }
     S.push({ type: cmd.type, value })
   },
   pop_i: () => {

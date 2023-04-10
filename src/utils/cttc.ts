@@ -550,7 +550,7 @@ export const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) =
 
 export const unifyReturnType = (annotation: SmlType, actual: SmlType) : [SmlType, Substitution] => {
   const type = constrainType(annotation, actual)
-  console.log(type, "CONSTRAINED")
+  // console.log(type, "CONSTRAINED")
 
   if (!type[0]) {
     throw new ReturnTypeError(annotation, actual)
@@ -676,8 +676,8 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined): [SmlType | 
   if (isTypeVar(given) || isTypeVar(scheme)) {
     const toReplace = isTypeVar(given) ? given : scheme
     const replacement = isTypeVar(given) ? scheme : given
-    console.log("REPLACE")
-    console.log(toReplace, replacement)
+    // console.log("REPLACE")
+    // console.log(toReplace, replacement)
     if (!forAllSet.has(toReplace)) {
       replaceTypeVar(toReplace as FreeType, replacement)
     }
