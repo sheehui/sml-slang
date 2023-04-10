@@ -2,12 +2,16 @@
 import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
+import {
+  PatternLenMatchError,
+  PatternMatchError,
+  PredicateTypeError
+} from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
 import * as cttc from '../utils/cttc'
 import { binaryOp, unaryOp } from '../utils/operators'
-import * as rttc from '../utils/rttc'
 
 const step_limit = 10000
 let A = new Stack<any>()
@@ -99,15 +103,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  TemplateLiteral: function* (node: es.TemplateLiteral) {
-    // Expressions like `${1}` are not allowed, so no processing needed
-    return node.quasis[0].value.cooked
-  },
-
-  ThisExpression: function* (node: es.ThisExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   ArrayExpression: function* (node: es.ArrayExpression, context: Context) {
     const elems = []
     const tag = node.leadingComments![0].value
@@ -153,58 +148,113 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
+    if (node.id) {
+      // recursive, so add the variable into type scheme env 
+      cttc.addToSchemeFrame(node.id.name, cttc.newSchemeVar())
+      // then eval identifier to get type annotations if any 
+      yield* evaluators[node.id.type](node.id, context)
+    }
     const params = []
-    let paramsTypes = [] 
+    let paramsTypes : SmlType = [] 
+
     // extend env here to eval func block
     const initEnv = cttc.getTypeEnv()
+    const initSchemeEnv = cttc.getSchemeEnv() 
     cttc.extendTypeEnv([], []) 
+    cttc.extendSchemeEnv([], [])
+
     for (let i = 0; i < node.params.length; i++) {
-      cttc.addToTypeFrame((node.params[i] as any).name, "'a") // some unassigned type
+      // add some unassigned type to type env (normal var by default)
+      // if it end up being a function type we handle it in the CallExpression
+      cttc.addToTypeFrame((node.params[i] as any).name, cttc.newTypeVar()) 
 
       const param = yield* evaluators[node.params[i].type](node.params[i], context)
       params.push(param)
-      paramsTypes.push(param.type)
-
-      cttc.addToTypeFrame(param.sym, param.type)
     }
-    paramsTypes.push('tuple')
-    paramsTypes = paramsTypes.length <= 2 ? paramsTypes[0] : paramsTypes
+
     const body = yield* evaluators[node.body.type](node.body, context) 
+
+    // convert params to a SmlType 
+    for (let i = 0; i < params.length; i++) {
+      paramsTypes.push(cttc.findTypeInEnv(params[i].sym))
+      if (i === params.length - 1 && i > 0) {
+        paramsTypes.push('tuple')
+      }
+    }
+    paramsTypes = paramsTypes.length === 1 
+      ? paramsTypes[0]
+      : paramsTypes
 
     // finish eval func block so restore the env
     cttc.restoreTypeEnv(initEnv)
+    cttc.restoreSchemeEnv(initSchemeEnv)
+
+    // check if free type var occurs in environment (para polymorphism)
+    // if it doesnt, generalise to 'a 
+    function generalise(type: SmlType) : SmlType {
+      if (!Array.isArray(type)) {
+        // search env for type 
+        if (cttc.isTypeVar(type) && !cttc.isTypeVarInEnv(type)) { // generalise 
+          cttc.forAllSet.add(type) 
+          return type
+        }
+      } else {
+        return type.map(x => generalise(x))
+      }
+      return type 
+    }
+    const type = generalise([paramsTypes, body.type, 'fun'])
     return {
       tag: 'lam', 
       params,
       body,
       id: node.id ? yield* evaluators[node.id.type](node.id, context) : node.id,
-      type: [paramsTypes, body.type, 'fun'], 
+      type, 
     }
   },
 
-  ArrowFunctionExpression: function* (node: es.ArrowFunctionExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   Identifier: function* (node: es.Identifier, context: Context) {    
-    let valType = (node as any).valType 
+    let valType = (node as any).valType
+    if (node.name === '_') {
+      return {
+        tag: 'id', 
+        sym: node.name,
+        type: valType ? valType : cttc.newTypeVar() 
+      }
+    }
     if (!valType) {
-      valType = cttc.findTypeInEnv(node.name) 
+      valType = cttc.isInTypeEnv(node.name) 
+        ? cttc.findTypeInEnv(node.name) 
+        : cttc.findSchemeInEnv(node.name)
     } else {
-      cttc.addToTypeFrame(node.name, valType)
+      valType = cttc.addToTypeFrame(node.name, valType)
+    }
+
+    // convert from scheme to smltype 
+    if (cttc.isFuncType(valType)) {
+      const fun = [] 
+      const args = valType.args.length === 1 ? valType.args[0] : [...valType.args, 'tuple'] 
+      fun.push(args)
+      fun.push(valType.return) 
+      fun.push('fun') 
+      valType = fun
     }
 
     return {
       tag: 'id', 
       sym: node.name,
-      type: valType  
+      type: valType
     }
   },
 
   CallExpression: function* (node: es.CallExpression, context: Context) {
+    if (node.callee.type === 'Identifier') {
+      // param types are Tn by default, so replace with Tn -> Tn1 if needed
+      cttc.modifyTypeScheme(node.callee.name, cttc.newSchemeVar()) 
+    }
     const fun = yield* evaluators[node.callee.type](node.callee, context)
+    const paramTypes = fun.type[0] // fun.type is a SmlType 
 
-    const paramTypes = fun.type[0] 
     let argTypes = []
     const args = [] 
     for (let i = 0; i < node.arguments.length; i++) { 
@@ -212,14 +262,15 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       argTypes.push(arg.type)
       args.push(arg)
     }
+
+    // convert argTypes to a SmlType 
     argTypes.push('tuple')
     argTypes = argTypes.length <= 2 ? argTypes[0] : argTypes
-    // check if param type can be assigned to arg type 
-    if (!rttc.isTypeArrSubset(argTypes, paramTypes)) {
-      throw new rttc.TypeError(node, ' as argument to function', rttc.typeToString(paramTypes), rttc.typeToString(argTypes))
-    }
 
-    const type = fun.type[1] 
+    const [unifyArgType, sub] = cttc.unifyReturnType(paramTypes, argTypes)
+    cttc.applySub(fun, sub)
+
+    const type = fun.type[1] // take the return type of fun as the call type
     return {
       tag: 'app', 
       fun, 
@@ -228,14 +279,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  NewExpression: function* (node: es.NewExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
     const arg = yield* evaluators[node.argument.type](node.argument, context)    
     const type = cttc.typeSchemeCheck(node.operator, [arg], undefined)
-    const [isEval, res] = cttc.partialEvaluate([arg], node.operator)
+    const [isEval, res] = cttc.partialEvaluate([arg], node.operator, 'unop')
 
     return isEval ? {
       tag: 'lit',
@@ -254,7 +301,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const scnd = yield* evaluators[node.right.type](node.right, context)
     const frst = yield* evaluators[node.left.type](node.left, context)
     const type = cttc.typeSchemeCheck(node.operator, [frst, scnd], undefined)
-    const [isEval, res] = cttc.partialEvaluate([frst, scnd], node.operator)
+    const [isEval, res] = cttc.partialEvaluate([frst, scnd], node.operator, 'binop')
 
     return isEval ? {
       tag: 'lit',
@@ -284,71 +331,126 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
     const pred = yield* evaluators[node.test.type](node.test, context)
-    if (!rttc.typeArrEqual(pred.type, 'bool')) {
-      throw new rttc.TypeError(node, " as predicate", 'boolean', pred.type)
+    if (pred.type !== 'bool') {
+      throw new PredicateTypeError(pred.type)
     }
     const cons = yield* evaluators[node.consequent.type](node.consequent, context)
     const alt = yield* evaluators[node.alternate.type](node.alternate, context)
+    const type = cttc.unifyBranches(cons.type, alt.type)[0]
+    const [isEval, res] = cttc.partialEvaluate([cons, alt], pred, 'cond')
 
-    const subsetOfConsAlt = rttc.isTypeArrSubset(cons.type, alt.type)
-    const subsetOfAltCons = rttc.isTypeArrSubset(alt.type, cons.type)
-
-    // check if neither types of cons and alt are subsets of the other
-    if (!subsetOfConsAlt || !subsetOfAltCons) {
-      throw Error(`Match rules disagree on type: Cannot merge '${cons.type}' and '${alt.type}'`)
-    }
-
-    return {
+    return isEval 
+    ? res 
+    : {
       tag: 'cond_expr', 
       pred,
       cons,
       alt,
       node: node,
-      type: subsetOfConsAlt ? subsetOfConsAlt : subsetOfAltCons,
+      type
     }
   },
 
-  LogicalExpression: function* (node: es.LogicalExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
-    // const decl = node.declarations[0]
-    // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+    function initIdType(exprType: SmlType, id: string) {
+      cttc.isTypedFun(exprType) 
+        ? cttc.addToSchemeFrame(id, cttc.newSchemeVar()) 
+        : cttc.addToTypeFrame(id, cttc.newTypeVar()) 
+    }
+
     const ids = [] 
     const exprs = []
     let localStartIdx = null 
     let localDecs = null 
     let localArity = null 
 
-
     for (let i = 0; i < node.declarations.length; i++) {
       const decl = node.declarations[i]
       // deal with local declarations
       const locals = (decl as any).locals 
-      const initEnv = cttc.getTypeEnv() 
+      
       if (locals) {
+        const initEnv = cttc.getTypeEnv()
+        const initSchemeEnv = cttc.getSchemeEnv()
         cttc.extendTypeEnv([], [])
+        cttc.extendSchemeEnv([], [])
         localStartIdx = i
         localDecs = yield* evaluators[locals.decs.type](locals.decs, context)
         localArity = locals.arity
-      }
 
-      cttc.addToTypeFrame((decl.id as any).name, 'free') // assign initial free type
-      const id = yield* evaluators[decl.id.type](decl.id, context)
+        const end = i + localArity 
+        while (i < end) {
+          const decl = node.declarations[i]
+          const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+          if (decl.id.type === "ArrayPattern" && cttc.isTypedTuple(expr.type)) {
+            if (decl.id.elements.length !== expr.type.length - 1) {
+              throw new PatternLenMatchError(decl.id.elements.length, expr.type.length - 1)
+            }
+            const idTupElems = []
+            for (let i = 0; i < decl.id.elements.length; i++) {
+              const currExprType = expr.type[i]
+              const elem = decl.id.elements[i]
+              if (!elem) break 
+              const sym = (elem as any).name
+              sym !== "_" && initIdType(currExprType, sym)
+
+              const id = yield* evaluators[elem.type](elem, context)
+              const type = cttc.unifyReturnType(id.type, currExprType)[0]
+              sym !== "_" && cttc.addToTypeFrame(id.sym, type, 1)
+              idTupElems.push(id) 
+            }
+            ids.push(idTupElems)
+          } else if (decl.id.type === "Identifier") {
+            initIdType(expr.type, (decl.id as any).name)
+            const id = yield* evaluators[decl.id.type](decl.id, context)
+            const type = cttc.unifyReturnType(id.type, expr.type)[0]
+            cttc.addToTypeFrame(id.sym, type, 1) 
+            
+            ids.push(id)
+          } else {
+            throw new PatternMatchError(expr.type)
+          }
+          exprs.push(expr)
+          i++  
+        }
+        cttc.restoreTypeEnv(initEnv)
+        cttc.restoreSchemeEnv(initSchemeEnv)
+        i-- 
+        continue 
+      }
 
       const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+      if (decl.id.type === "ArrayPattern" && cttc.isTypedTuple(expr.type)) {
+        if (decl.id.elements.length !== expr.type.length - 1) {
+          throw new PatternLenMatchError(decl.id.elements.length, expr.type.length - 1)
+        }
+        const idTupElems = []
+        for (let i = 0; i < decl.id.elements.length; i++) {
+          const currExprType = expr.type[i]
+          const elem = decl.id.elements[i]
+          if (!elem) break 
+          const sym = (elem as any).name
+          sym !== "_" && initIdType(currExprType, sym)
 
-      if (locals) {
-        cttc.restoreTypeEnv(initEnv)
+          const id = yield* evaluators[elem.type](elem, context)
+          const type = cttc.unifyReturnType(id.type, currExprType)[0]
+          sym !== "_" && cttc.addToTypeFrame(id.sym, type)
+          idTupElems.push(id) 
+        }
+        ids.push(idTupElems)
+      } else if (decl.id.type === "Identifier") {
+        initIdType(expr.type, (decl.id as any).name)
+        const id = yield* evaluators[decl.id.type](decl.id, context)
+        const type = cttc.unifyReturnType(id.type, expr.type)[0]
+        cttc.addToTypeFrame(id.sym, type) 
+        
+        ids.push(id)
+      } else {
+        throw new PatternMatchError(expr.type)
       }
-
-      const type = cttc.unifyReturnType(id.type, expr.type)
-      cttc.addToTypeFrame(id.sym, type) 
-      
-      ids.push(id)
       exprs.push(expr)
     }
+
     return {
       tag: 'var',
       ids, 
@@ -359,31 +461,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  ContinueStatement: function* (_node: es.ContinueStatement, _context: Context) {
-    throw new Error(`not supported yet: ${_node.type}`)
-  },
-
-  BreakStatement: function* (_node: es.BreakStatement, _context: Context) {
-    throw new Error(`not supported yet: ${_node.type}`)
-  },
-
-  ForStatement: function* (node: es.ForStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-
-  AssignmentExpression: function* (node: es.AssignmentExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  FunctionDeclaration: function* (node: es.FunctionDeclaration, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  IfStatement: function* (node: es.IfStatement | es.ConditionalExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   ExpressionStatement: function* (node: es.ExpressionStatement, context: Context) {
     return yield* evaluators[node.expression.type](node.expression, context)
   },
@@ -392,9 +469,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     const body = []
     let type = undefined 
     const locals = (node as any).locals
-    const initEnv = cttc.getTypeEnv()  
+    const initEnv = cttc.getTypeEnv()
+    const initSchemeEnv = cttc.getSchemeEnv()  
     if (locals) {
       cttc.extendTypeEnv([], []) 
+      cttc.extendSchemeEnv([], [])
       const localDecs = yield* evaluators[locals.type](locals, context)
       body.push(localDecs)
     }
@@ -409,6 +488,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     if (locals) {
       // restore env 
       cttc.restoreTypeEnv(initEnv)
+      cttc.restoreSchemeEnv(initSchemeEnv) 
     }
     
     return locals ? {
@@ -425,15 +505,6 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       type 
     }
   },
-
-  ReturnStatement: function* (node: es.ReturnStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  WhileStatement: function* (node: es.WhileStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
 
   BlockStatement: function* (node: es.BlockStatement, context: Context) {
     const stmts = []; 
@@ -459,10 +530,11 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   },
 
   Program: function* (node: es.BlockStatement, context: Context) {
-    const progBlk = node.body[0]
-    return yield* evaluators[progBlk.type](progBlk, context); 
+    const progBlk = node.body[0] as es.BlockStatement
+    if (progBlk.body.length !== 0) {
+      return yield* evaluators[progBlk.type](progBlk, context); 
+    }
   }
-  
 }
 
 const microcode: { [tag: string]: Function } = {
@@ -492,7 +564,7 @@ const microcode: { [tag: string]: Function } = {
     }
   },
   lit: (cmd: { val: any; type: SmlType }) => {
-    S.push({type: cmd.type, value: cmd.val})
+    S.push({ type: cmd.type, value: cmd.val })
   },
   id: (cmd: { sym: string }) => {
     let env: Environment | null = E
@@ -567,8 +639,8 @@ const microcode: { [tag: string]: Function } = {
     A.push({ tag: 'assmt_i', id: cmd.id, frameOffset: cmd.frameOffset })
     A.push(cmd.expr)
   },
-  lam: (cmd: { params: any[]; body: es.BlockStatement; id: any }) => {
-    A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E })
+  lam: (cmd: { params: any[]; body: es.BlockStatement; id: any; type: SmlType }) => {
+    A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E, type: cmd.type })
   },
   list_lit: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
     A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node, type: cmd.type })
@@ -631,10 +703,31 @@ const microcode: { [tag: string]: Function } = {
   },
   assmt_i: (cmd: { id: any; frameOffset: number }) => {
     const val = S.peek()
-    if (cmd.frameOffset && E.tail) {
-      return (E.tail.head[cmd.id.sym] = val)
+    if (Array.isArray(cmd.id)) {
+      S.pop()
+      const patt = []
+      for (let i = 0; i < val.value.length; i++) {
+        const curr = cmd.id[i]
+        if (curr.sym === '_') continue
+        if (cmd.frameOffset && E.tail) {
+          E.tail.head[curr.sym] = val.value[i]
+          continue
+        }
+        E.head[curr.sym] = { value: val.value[i], type: val.type[i] }
+        patt.push({ value: val.value[i], type: val.type[i] })
+      }
+      S.push(patt)
+    } else {
+      if (cmd.frameOffset && E.tail) {
+        return (E.tail.head[cmd.id.sym] = val)
+      }
+      if (cmd.id.sym === '_') {
+        S.pop()
+        S.push([])
+      } else {
+        E.head[cmd.id.sym] = val
+      }
     }
-    E.head[cmd.id.sym] = val
   },
   list_lit_i: (cmd: { len: number; node: es.ArrayExpression; type: SmlType }) => {
     const list = []
@@ -663,24 +756,26 @@ const microcode: { [tag: string]: Function } = {
     for (let i = 0; i < cmd.len; i++) {
       const elem = S.pop()
       tuple.push(elem.value)
-      type.push(rttc.getElemType(elem))
+      type.push(elem.type)
     }
     type.push('tuple')
     S.push({ type: type, value: tuple })
   },
   record_i: (cmd: { index: number; node: es.MemberExpression }) => {
     const tuple = S.pop()
-    S.push(rttc.getTypedTupleElem(cmd.node, tuple, cmd.index))
+    S.push({ type: tuple.type[cmd.index], value: tuple.value[cmd.index] })
   },
   app_i: (cmd: { arity: number; isCheck: boolean }) => {
     const args = []
     for (let i = 0; i < cmd.arity; i++) {
       args.push(S.pop())
     }
-    const func = S.pop()
+    const func = S.pop().value
 
-    // TODO: Implement tail call
-    A.push({ tag: 'env_i', env: E })
+    // tail call
+    if (A.size() !== 0 && A.peek().tag !== 'env_i') {
+      A.push({ tag: 'env_i', env: E })
+    }
 
     A.push(func.body)
     // set E to the function env, extended with params and args
@@ -699,8 +794,15 @@ const microcode: { [tag: string]: Function } = {
     const pred = S.pop()
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
-  closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
-    S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
+  closure_i: (cmd: { params: any[]; body: any; env: Environment; type: SmlType }) => {
+    const value = {
+      tag: 'closure',
+      params: cmd.params,
+      body: cmd.body,
+      env: cmd.env,
+      type: cmd.type
+    }
+    S.push({ type: cmd.type, value })
   },
   pop_i: () => {
     S.pop()
@@ -713,14 +815,15 @@ export function* evaluate(node: es.Node, context: Context): any {
   S = new Stack<Value>()
   E = createGlobalEnvironment()
   cttc.resetTypeEnv()
-  console.log('=====START EVALUATION=====')
+  cttc.resetSchemeEnv()
+  // console.log('=====START EVALUATION=====')
   A.push(yield* evaluators[node.type](node, context))
   let i = 0
   while (i < step_limit) {
     if (A.size() === 0) break
     const cmd = A.pop()
-    console.log('\n=====instruction====')
-    console.log(cmd)
+    // console.log('\n=====instruction====')
+    // console.log(cmd)
     // console.log("\n=====agenda====")
     // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
@@ -730,16 +833,17 @@ export function* evaluate(node: es.Node, context: Context): any {
       // console.log('after stash:')
       // S.print() // print stash
     } else {
-      throw Error("Unsupported microcode tag: " + cmd.tag)
+      // throw Error('Bad command')
     }
     i++
   }
 
   // const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
-  console.log('\n=====EXIT EVALUATION=====\n')
+  // console.log('\n=====EXIT EVALUATION=====\n')
   const r = S.pop()
-  console.log(r)
-  console.log(cttc.getTypeEnv().head)
+  // console.log(r)
+  // console.log(cttc.getTypeEnv().head)
+  // console.log(cttc.getSchemeEnv().head)
   return r
 }

@@ -258,6 +258,8 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
+export type FreeType = `T${number}`
+
 export type SmlType =
   | 'bool'
   | 'int'
@@ -267,7 +269,7 @@ export type SmlType =
   | "'a"
   | 'fun'
   | Array<SmlType>
-  | 'free'
+  | FreeType
 
 export interface SmlClosure {
   tag: 'closure'

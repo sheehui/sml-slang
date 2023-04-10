@@ -1,8 +1,7 @@
-import { BinaryOperator, SourceLocation, UnaryOperator } from 'estree'
+import { BinaryOperator, UnaryOperator } from 'estree'
 
 import { LazyBuiltIn } from '../createContext'
-import { CallingNonFunctionValue, ExceptionError, InvalidNumberOfArguments } from '../errors/errors'
-import { RuntimeSourceError } from '../errors/runtimeSourceError'
+import { DivisionError } from '../errors/runtimeSourceError'
 import { Thunk, TypedValue } from '../types'
 import * as create from './astCreator'
 import { makeWrapper } from './makeWrapper'
@@ -52,63 +51,6 @@ export function makeLazyFunction(candidate: any) {
   return new LazyBuiltIn(candidate, false)
 }
 
-export function callIfFuncAndRightArgs(
-  candidate: any,
-  line: number,
-  column: number,
-  ...args: any[]
-) {
-  const dummy = create.callExpression(create.locationDummyNode(line, column), args, {
-    start: { line, column },
-    end: { line, column }
-  })
-
-  if (typeof candidate === 'function') {
-    const originalCandidate = candidate
-    if (candidate.transformedFunction !== undefined) {
-      candidate = candidate.transformedFunction
-    }
-    const expectedLength = candidate.length
-    const receivedLength = args.length
-    const hasVarArgs = candidate.minArgsNeeded !== undefined
-    if (hasVarArgs ? candidate.minArgsNeeded > receivedLength : expectedLength !== receivedLength) {
-      throw new InvalidNumberOfArguments(
-        dummy,
-        hasVarArgs ? candidate.minArgsNeeded : expectedLength,
-        receivedLength,
-        hasVarArgs
-      )
-    }
-    try {
-      const forcedArgs = args.map(forceIt)
-      return originalCandidate(...forcedArgs)
-    } catch (error) {
-      // if we already handled the error, simply pass it on
-      if (!(error instanceof RuntimeSourceError || error instanceof ExceptionError)) {
-        throw new ExceptionError(error, dummy.loc!)
-      } else {
-        throw error
-      }
-    }
-  } else if (candidate instanceof LazyBuiltIn) {
-    try {
-      if (candidate.evaluateArgs) {
-        args = args.map(forceIt)
-      }
-      return candidate.func(...args)
-    } catch (error) {
-      // if we already handled the error, simply pass it on
-      if (!(error instanceof RuntimeSourceError || error instanceof ExceptionError)) {
-        throw new ExceptionError(error, dummy.loc!)
-      } else {
-        throw error
-      }
-    }
-  } else {
-    throw new CallingNonFunctionValue(candidate, dummy)
-  }
-}
-
 export function boolOrErr(candidate: any, line: number, column: number) {
   candidate = forceIt(candidate)
   const error = rttc.checkIfStatement(create.locationDummyNode(line, column), candidate)
@@ -156,6 +98,9 @@ export function evaluateBinaryExpression(operator: BinaryOperator | string, left
     case '*':
       return l * r
     case '/':
+      if (r === 0) {
+        throw new DivisionError('Div: Unable to evaluate division by zero.')
+      }
       return Math.floor(l / r)
     case '%':
       return l % r

@@ -3,6 +3,7 @@ import * as es from 'estree'
 import { UNKNOWN_LOCATION } from '../constants'
 import { ErrorSeverity, ErrorType, SmlType, SourceError } from '../types'
 import { FunctionType } from '../utils/cttc'
+import { argToString, functionTypeToString, smlTypeToString } from '../utils/formatters'
 
 export class CompileTimeSourceError implements SourceError {
   public type = ErrorType.COMPILE_TIME
@@ -66,77 +67,82 @@ export class ReturnTypeError extends CompileTimeSourceError {
   }
 }
 
-const functionTypeToString = (type: FunctionType): string => {
-  let result = ''
+export class PredicateTypeError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
 
-  for (let i = 0; i < type.args.length; i++) {
-    const element = type.args[i]
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
+  constructor(public got: SmlType) {
+    super()
+    this.got = got
   }
 
-  result += ' -> '
-
-  result += smlTypeToString(type.return) // abit sus
-
-  return result
-}
-
-const argToString = (type: FunctionType): string => {
-  let result = ''
-
-  for (let i = 0; i < type.args.length; i++) {
-    const element = type.args[i]
-    if (i !== 0) {
-      result += ' * '
-    }
-
-    result += smlTypeToString(element)
+  public explain() {
+    return `Expected predicate of type "bool", got "${smlTypeToString(this.got)}".`
   }
 
-  return result
+  public elaborate() {
+    return this.explain()
+  }
 }
 
-const smlTypeToString = (type: SmlType): string => {
-  const isTypeArr = Array.isArray(type)
-  if (isTypeArr && type[type.length - 1] == 'list') {
-    let str = ''
+export class MatchTypeError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
 
-    type.forEach((element: SmlType | Array<SmlType>) => {
-      if (Array.isArray(element)) {
-        str += ' ' + smlTypeToString(element)
-      } else {
-        str += ' ' + element
-      }
-    })
+  constructor(public expected: SmlType, public got: SmlType) {
+    super()
+    this.expected = expected
+    this.got = got
+  }
 
-    return str.trim()
-  } else if (isTypeArr && type[type.length - 1] == 'tuple') {
-    let str = '('
+  public explain() {
+    return `Match rules disagree on type: Cannot merge "${smlTypeToString(
+      this.expected
+    )}" and "${smlTypeToString(this.got)}".`
+  }
 
-    for (let i = 0; i < type.length - 1; i++) {
-      const element = type[i]
-      if (i !== 0) {
-        str += ' * '
-      }
-      if (Array.isArray(element)) {
-        str += smlTypeToString(element)
-      } else {
-        str += element
-      }
-    }
-    str += ')'
+  public elaborate() {
+    return this.explain()
+  }
+}
 
-    return str
-  } else if (isTypeArr && type[type.length - 1] == 'fun') {
-    const paramsType = Array.isArray(type[0]) ? smlTypeToString(type[0]) : type[0]
-    const retType = Array.isArray(type[1]) ? smlTypeToString(type[1]) : type[1]
+export class PatternMatchError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
 
-    return `${paramsType} -> ${retType}`
-  } else {
-    return type.toString()
+  constructor(public got: SmlType) {
+    super()
+    this.got = got
+  }
+
+  public explain() {
+    return `Expected pattern of record type, got "${smlTypeToString(this.got)}".`
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}
+
+export class PatternLenMatchError extends CompileTimeSourceError {
+  public type = ErrorType.COMPILE_TIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
+
+  constructor(public expected: number, public got: number) {
+    super()
+    this.expected = expected
+    this.got = got
+  }
+
+  public explain() {
+    return `Expected a record type with ${this.expected} entries, but the given record has ${this.got} entries.`
+  }
+
+  public elaborate() {
+    return this.explain()
   }
 }
