@@ -184,12 +184,28 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     // finish eval func block so restore the env
     cttc.restoreTypeEnv(initEnv)
     cttc.restoreSchemeEnv(initSchemeEnv)
+
+    // check if free type var occurs in environment (para polymorphism)
+    // if it doesnt, generalise to 'a 
+    function generalise(type: SmlType) : SmlType {
+      if (!Array.isArray(type)) {
+        // search env for type 
+        if (cttc.isTypeVar(type) && !cttc.isTypeVarInEnv(type)) { // generalise 
+          cttc.forAllSet.add(type) 
+          return type
+        }
+      } else {
+        return type.map(x => generalise(x))
+      }
+      return type 
+    }
+    const type = generalise([paramsTypes, body.type, 'fun'])
     return {
       tag: 'lam', 
       params,
       body,
       id: node.id ? yield* evaluators[node.id.type](node.id, context) : node.id,
-      type: [paramsTypes, body.type, 'fun'], 
+      type, 
     }
   },
 
@@ -247,9 +263,10 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     argTypes.push('tuple')
     argTypes = argTypes.length <= 2 ? argTypes[0] : argTypes
 
-    cttc.unifyReturnType(paramTypes, argTypes)
+    const [unifyArgType, sub] = cttc.unifyReturnType(paramTypes, argTypes)
+    cttc.applySub(fun, sub)
 
-    const type = fun.type[1] // take the return type of fun as the call type 
+    const type = fun.type[1] // take the return type of fun as the call type
     return {
       tag: 'app', 
       fun, 
@@ -315,7 +332,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
     const cons = yield* evaluators[node.consequent.type](node.consequent, context)
     const alt = yield* evaluators[node.alternate.type](node.alternate, context)
-    const type = cttc.unifyBranches(cons.type, alt.type) 
+    const type = cttc.unifyBranches(cons.type, alt.type)[0]
     const [isEval, res] = cttc.partialEvaluate([cons, alt], pred, 'cond')
 
     return isEval 
@@ -374,7 +391,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
               sym !== "_" && initIdType(currExprType, sym)
 
               const id = yield* evaluators[elem.type](elem, context)
-              const type = cttc.unifyReturnType(id.type, currExprType)
+              const type = cttc.unifyReturnType(id.type, currExprType)[0]
               sym !== "_" && cttc.addToTypeFrame(id.sym, type, 1)
               idTupElems.push(id) 
             }
@@ -382,7 +399,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           } else if (decl.id.type === "Identifier") {
             initIdType(expr.type, (decl.id as any).name)
             const id = yield* evaluators[decl.id.type](decl.id, context)
-            const type = cttc.unifyReturnType(id.type, expr.type) 
+            const type = cttc.unifyReturnType(id.type, expr.type)[0]
             cttc.addToTypeFrame(id.sym, type, 1) 
             
             ids.push(id)
@@ -412,7 +429,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
           sym !== "_" && initIdType(currExprType, sym)
 
           const id = yield* evaluators[elem.type](elem, context)
-          const type = cttc.unifyReturnType(id.type, currExprType)
+          const type = cttc.unifyReturnType(id.type, currExprType)[0]
           sym !== "_" && cttc.addToTypeFrame(id.sym, type)
           idTupElems.push(id) 
         }
@@ -420,7 +437,7 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       } else if (decl.id.type === "Identifier") {
         initIdType(expr.type, (decl.id as any).name)
         const id = yield* evaluators[decl.id.type](decl.id, context)
-        const type = cttc.unifyReturnType(id.type, expr.type) 
+        const type = cttc.unifyReturnType(id.type, expr.type)[0]
         cttc.addToTypeFrame(id.sym, type) 
         
         ids.push(id)
@@ -806,7 +823,7 @@ export function* evaluate(node: es.Node, context: Context): any {
   yield* leave(context)
   // console.log('\n=====EXIT EVALUATION=====\n')
   const r = S.pop()
-  console.log(r)
+  // console.log(r)
   // console.log(cttc.getTypeEnv().head)
   // console.log(cttc.getSchemeEnv().head)
   return r
