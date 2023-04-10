@@ -1,6 +1,6 @@
 # SML Slang
 
-Sub language of Standard ML
+Standard ML sublanguage
 
 ## Possible Issues (and manual solutions)
 
@@ -61,14 +61,6 @@ To try out _SML Slang_ in a REPL, run
 
 ```{.}
 $ yarn repl ''
-```
-
-You can set additional options:
-
-```{.}
-Usage: yarn repl [PROGRAM_STRING] [OPTION]
-  -h, --help            display this help
-  -e, --eval            don't show REPL, only display output of evaluation
 ```
 
 Hint: In `bash` you can take the `PROGRAM_STRING` out of a file as follows:
