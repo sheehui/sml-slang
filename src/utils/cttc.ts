@@ -658,7 +658,7 @@ export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType =
       : currType
   } else {
     if (Array.isArray(currType)) {
-      currType.push('list')
+      currType = [currType, 'list']
     }
     throw new FunctionTypeError(LIST_SCHEME, { args: [newType, currType], return: newTypeVar() })
   }
