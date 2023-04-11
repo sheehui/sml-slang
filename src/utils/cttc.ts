@@ -658,7 +658,11 @@ export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType =
       : currType
   } else {
     if (Array.isArray(currType)) {
-      currType = [currType, 'list']
+      if (isTypedTuple(currType)) {
+        currType = [currType, 'list']
+      } else {
+        currType.push('list')
+      }
     }
     throw new FunctionTypeError(LIST_SCHEME, { args: [newType, currType], return: newTypeVar() })
   }
