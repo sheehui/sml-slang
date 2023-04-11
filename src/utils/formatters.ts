@@ -96,8 +96,12 @@ export const smlTypedValToString = (sml: TypedValue) : string => {
 
     for (let i = 0; i < sml.value.length; i++) {
       const element = sml.value[i]
-      const copy = clone(sml.type)
-      copy.pop()
+      let copy = clone(sml.type)
+      if (copy.length === 2 && Array.isArray(copy[0])) {
+        copy = copy[0]
+      } else {
+        copy.pop()
+      }
       str += smlTypedValToString({
         type: copy,
         value: element
