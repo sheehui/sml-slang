@@ -25,7 +25,6 @@
     "resolveJsonModule": true,
     "noUnusedLocals": false,
     "incremental": true,
-    "ignoreDeprecations": "5.0"
   },
   "exclude": [
     "src/stdlib/metacircular-interpreter",
