@@ -24,15 +24,15 @@
     "suppressImplicitAnyIndexErrors": true,
     "resolveJsonModule": true,
     "noUnusedLocals": false,
-    "incremental": true
+    "incremental": true,
+    "ignoreDeprecations": "5.0"
   },
   "exclude": [
     "src/stdlib/metacircular-interpreter",
     "src/stdlib/**/*.js",
     "node_modules",
     "dist",
-    "sicp_publish",
-    "repl_source.ts",
+    "sicp_publish"
   ],
   "types": [
     "typePatches",
