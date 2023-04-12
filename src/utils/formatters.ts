@@ -80,9 +80,10 @@ export const argToString = (type: FunctionType): string => {
 
   return result
 }
-const clone = (items: any[]) : any => items.map((item: any) => Array.isArray(item) ? clone(item) : item)
+const clone = (items: any[]): any =>
+  items.map((item: any) => (Array.isArray(item) ? clone(item) : item))
 
-export const smlTypedValToString = (sml: TypedValue) : string => {
+export const smlTypedValToString = (sml: TypedValue): string => {
   if (typeof sml.type === 'string') {
     return sml.value.toString()
   }
@@ -91,7 +92,7 @@ export const smlTypedValToString = (sml: TypedValue) : string => {
     let str = '['
 
     if (!Array.isArray(sml.value)) {
-      throw Error("bad value")
+      throw Error('bad value')
     }
 
     for (let i = 0; i < sml.value.length; i++) {
@@ -107,7 +108,7 @@ export const smlTypedValToString = (sml: TypedValue) : string => {
         value: element
       })
       if (i !== sml.value.length - 1) {
-        str += ", "
+        str += ', '
       }
     }
 
@@ -116,7 +117,7 @@ export const smlTypedValToString = (sml: TypedValue) : string => {
     let str = '('
 
     if (!Array.isArray(sml.value)) {
-      throw Error("bad value")
+      throw Error('bad value')
     }
 
     for (let i = 0; i < sml.type.length - 1; i++) {
@@ -126,7 +127,7 @@ export const smlTypedValToString = (sml: TypedValue) : string => {
         value: sml.value[i]
       })
       if (i !== sml.value.length - 1) {
-        str += ", "
+        str += ', '
       }
     }
 
@@ -134,12 +135,11 @@ export const smlTypedValToString = (sml: TypedValue) : string => {
 
     return str
   } else if (isTypeArr && sml.type[sml.type.length - 1] == 'fun') {
-    return "fn"
+    return 'fn'
   } else {
     return sml.value.toString()
   }
 }
-
 
 export const smlTypeToString = (type: SmlType): string => {
   const isTypeArr = Array.isArray(type)

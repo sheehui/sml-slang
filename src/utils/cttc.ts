@@ -244,7 +244,7 @@ export const isInTypeEnv = (vars: string): boolean => {
 export const replaceTypeVar = (toReplace: SmlType, replacement: SmlType) => {
   if (forAllSet.has(toReplace)) {
     forAllSet.delete(toReplace)
-    forAllSet.add(replacement) 
+    forAllSet.add(replacement)
   }
   let env: TypeEnv | null = typeEnv
   let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
@@ -274,22 +274,21 @@ export const replaceTypeVar = (toReplace: SmlType, replacement: SmlType) => {
   }
 }
 
-export const forAllSet = new Set() 
+export const forAllSet = new Set()
 
-export const isTypeVarInEnv = (toFind: SmlType) : boolean => {
+export const isTypeVarInEnv = (toFind: SmlType): boolean => {
   let env: TypeEnv | null = typeEnv
   while (env) {
     const frame: TypeFrame = env.head
     for (const key in frame) {
       if (frame[key] === toFind) {
-        return true 
+        return true
       }
     }
     env = env.tail
   }
-  return false 
+  return false
 }
-
 
 /**
  * Type Scheme Environment Support
@@ -368,38 +367,36 @@ export type Substitution = {
   [key: FreeType]: SmlType
 }
 
-export function replace(type: SmlType, sub: Substitution) : any {
+export function replace(type: SmlType, sub: Substitution): any {
   if (!Array.isArray(type)) {
-    return sub.hasOwnProperty(type)
-      ? sub[type]
-      : type 
+    return sub.hasOwnProperty(type) ? sub[type] : type
   } else {
-    const result = [] 
+    const result = []
     for (let i = 0; i < type.length - 1; i++) {
       result.push(replace(type[i], sub))
     }
-    result.push(type[type.length - 1]) 
-    return result 
+    result.push(type[type.length - 1])
+    return result
   }
 }
 
-export function applySub(instr: any, sub: Substitution) : any {
+export function applySub(instr: any, sub: Substitution): any {
   for (const key in instr) {
     if (key === 'type') {
-      instr[key] = replace(instr[key], sub) 
+      instr[key] = replace(instr[key], sub)
     } else if (typeof instr[key] === 'object' && instr[key] !== null) {
       applySub(instr[key], sub)
-    } 
+    }
   }
 }
 
 export function schemeToSmlType(valType: any) {
   if (isFuncType(valType)) {
-    const fun = [] 
-    const args = valType.args.length === 1 ? valType.args[0] : [...valType.args, 'tuple'] 
+    const fun = []
+    const args = valType.args.length === 1 ? valType.args[0] : [...valType.args, 'tuple']
     fun.push(args)
-    fun.push(valType.return) 
-    fun.push('fun') 
+    fun.push(valType.return)
+    fun.push('fun')
     return fun
   }
   return valType
@@ -428,7 +425,6 @@ export const modifyTypeScheme = (sym: string, replacement: FunctionType) => {
   }
   throw Error(`Unbound variable ${sym}`)
 }
-
 
 /**
  * Partial Evaluation
@@ -562,7 +558,7 @@ export const unifyScheme = (schemeType: FunctionType, givenType: FunctionType) =
   }
 }
 
-export const unifyReturnType = (annotation: SmlType, actual: SmlType) : [SmlType, Substitution] => {
+export const unifyReturnType = (annotation: SmlType, actual: SmlType): [SmlType, Substitution] => {
   const type = constrainType(annotation, actual)
   // console.log(type, "CONSTRAINED")
 
@@ -573,7 +569,7 @@ export const unifyReturnType = (annotation: SmlType, actual: SmlType) : [SmlType
   return [type[0], type[1]]
 }
 
-export const unifyBranches = (cons: SmlType, alt: SmlType) : [SmlType, Substitution] => {
+export const unifyBranches = (cons: SmlType, alt: SmlType): [SmlType, Substitution] => {
   const type = constrainType(cons, alt)
 
   if (!type[0]) {
@@ -686,9 +682,12 @@ export const unifyListLitType = (currType: SmlType, newType: SmlType): SmlType =
  * Constrain Functions
  */
 
-const constrainType = (scheme: SmlType, given: SmlType | undefined): [SmlType | undefined, Substitution] => {
+const constrainType = (
+  scheme: SmlType,
+  given: SmlType | undefined
+): [SmlType | undefined, Substitution] => {
   if (!given) {
-    return [scheme, {}] 
+    return [scheme, {}]
   }
 
   if (isTypeVar(given) || isTypeVar(scheme)) {
@@ -699,7 +698,7 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined): [SmlType | 
     if (!forAllSet.has(toReplace)) {
       replaceTypeVar(toReplace as FreeType, replacement)
     }
-    return [replacement, { [toReplace as FreeType]: replacement}]
+    return [replacement, { [toReplace as FreeType]: replacement }]
   }
 
   if (isTypedList(scheme) && isTypedList(given)) {
@@ -707,18 +706,18 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined): [SmlType | 
   }
 
   if (isTypedTuple(scheme) && isTypedTuple(given)) {
-    const result : SmlType = []
-    let sub = {} 
+    const result: SmlType = []
+    let sub = {}
     for (let i = 0; i < scheme.length - 1; i++) {
       const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
       if (!constrained[0]) {
-        return [undefined, {}] 
+        return [undefined, {}]
       }
       result.push(constrained[0])
-      sub = { ...sub, ...constrained[1]}
+      sub = { ...sub, ...constrained[1] }
     }
     result.push('tuple')
-    return [result, sub] 
+    return [result, sub]
   }
 
   if (isFreeLiteral(scheme) || isFreeLiteral(given)) {
@@ -726,21 +725,21 @@ const constrainType = (scheme: SmlType, given: SmlType | undefined): [SmlType | 
   }
 
   if (isTypedFun(scheme) && isTypedFun(given)) {
-    const result : SmlType = []
-    let sub = {} 
+    const result: SmlType = []
+    let sub = {}
     for (let i = 0; i < scheme.length - 1; i++) {
       const constrained = constrainType(scheme[i] as SmlType, given[i] as SmlType)
       if (!constrained[0]) {
-        return [undefined, {}] 
+        return [undefined, {}]
       }
       result.push(constrained[0])
-      sub = { ...sub, ...constrained[1]}
+      sub = { ...sub, ...constrained[1] }
     }
     result.push('fun')
-    return [result, sub] 
+    return [result, sub]
   }
 
-  return isStrictEqual(scheme, given) ? [scheme, {}] : [undefined, {}] 
+  return isStrictEqual(scheme, given) ? [scheme, {}] : [undefined, {}]
 }
 
 const constrainListType = (scheme: SmlType, given: SmlType) => {
