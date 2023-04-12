@@ -10,7 +10,7 @@ Standard ML sublanguage
 # Table of Contents
 
 - [Requirements](#requirements)
-- [Using sml-slang with Local Frontend (Recommended)](#using-sml-slang-with-your-local-frontend-recommended)
+- [Using sml-slang with Local Frontend](#using-sml-slang-with-your-local-frontend)
 - [Command Line Usage](#usage)
 - [Testing](#testing)
 
@@ -18,13 +18,14 @@ Standard ML sublanguage
 
 - node: known working version: v16.14.0
 
-# Using sml-slang with your local frontend (Recommended)
+# Using sml-slang with your local frontend
 
 A common issue when developing modifications to sml-slang is how to test it using your own local frontend. We have provided a simple frontend [here](https://github.com/sheehui/sml-frontend) to get you started.
 
 First, build and link your local sml-slang:
 
 ```{.}
+$ git clone https://github.com/sheehui/sml-slang
 $ cd sml-slang
 $ yarn
 $ yarn build
@@ -34,6 +35,7 @@ $ yarn link
 Then, from your local copy of frontend:
 
 ```{.}
+$ git clone https://github.com/sheehui/sml-frontend
 $ cd sml-frontend
 $ yarn link sml-slang
 ```
