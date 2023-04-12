@@ -290,29 +290,6 @@ export const isTypeVarInEnv = (toFind: SmlType) : boolean => {
   return false 
 }
 
-// finds most recent occurance of sym in the env, if its a free variable (i.e. T0)
-// replace it with a free function type (i.e. Tn1 -> Tn2)
-export const modifyTypeScheme = (sym: string, replacement: FunctionType) => {
-  let env: TypeEnv | null = typeEnv
-  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
-  while (env && schemeEnv) {
-    const frame: TypeFrame = env.head
-    const schemeFrame: TypeSchemeFrame = schemeEnv.head
-    if (schemeFrame.hasOwnProperty(sym)) {
-      return
-    }
-    if (frame.hasOwnProperty(sym)) {
-      if (isTypeVar(frame[sym])) {
-        delete frame[sym]
-        schemeFrame[sym] = replacement
-      }
-      return
-    }
-    schemeEnv = schemeEnv.tail
-    env = env.tail
-  }
-  throw Error(`Unbound variable ${sym}`)
-}
 
 /**
  * Type Scheme Environment Support
@@ -415,6 +392,43 @@ export function applySub(instr: any, sub: Substitution) : any {
     } 
   }
 }
+
+export function schemeToSmlType(valType: any) {
+  if (isFuncType(valType)) {
+    const fun = [] 
+    const args = valType.args.length === 1 ? valType.args[0] : [...valType.args, 'tuple'] 
+    fun.push(args)
+    fun.push(valType.return) 
+    fun.push('fun') 
+    return fun
+  }
+  return valType
+}
+
+// finds most recent occurance of sym in the env, if its a free variable (i.e. T0)
+// replace it with a free function type (i.e. Tn1 -> Tn2)
+export const modifyTypeScheme = (sym: string, replacement: FunctionType) => {
+  let env: TypeEnv | null = typeEnv
+  let schemeEnv: TypeSchemeEnv | null = typeSchemeEnv
+  while (env && schemeEnv) {
+    const frame: TypeFrame = env.head
+    const schemeFrame: TypeSchemeFrame = schemeEnv.head
+    if (schemeFrame.hasOwnProperty(sym)) {
+      return
+    }
+    if (frame.hasOwnProperty(sym)) {
+      if (isTypeVar(frame[sym])) {
+        delete frame[sym]
+        schemeFrame[sym] = replacement
+      }
+      return
+    }
+    schemeEnv = schemeEnv.tail
+    env = env.tail
+  }
+  throw Error(`Unbound variable ${sym}`)
+}
+
 
 /**
  * Partial Evaluation

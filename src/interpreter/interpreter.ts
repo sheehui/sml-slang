@@ -230,15 +230,9 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
       valType = cttc.addToTypeFrame(node.name, valType)
     }
 
+
     // convert from scheme to smltype 
-    if (cttc.isFuncType(valType)) {
-      const fun = [] 
-      const args = valType.args.length === 1 ? valType.args[0] : [...valType.args, 'tuple'] 
-      fun.push(args)
-      fun.push(valType.return) 
-      fun.push('fun') 
-      valType = fun
-    }
+    valType = cttc.schemeToSmlType(valType)
 
     return {
       tag: 'id', 
