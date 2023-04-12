@@ -20,3 +20,19 @@ export class RuntimeSourceError implements SourceError {
     return this.explain()
   }
 }
+
+export class DivisionError implements SourceError {
+  public type = ErrorType.RUNTIME
+  public severity = ErrorSeverity.ERROR
+  public location: es.SourceLocation
+
+  constructor(public msg: string) {}
+
+  public explain() {
+    return this.msg
+  }
+
+  public elaborate() {
+    return this.explain()
+  }
+}

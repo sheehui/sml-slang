@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { start } from 'repl' // 'repl' here refers to the module named 'repl' in index.d.ts
-import { inspect } from 'util'
 
 import { sourceLanguages } from '../constants'
+import { CompileTimeSourceError } from '../errors/compileTimeSourceError'
+import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { createContext, IOptions, parseError, runInContext } from '../index'
 import { ExecutionMethod, Variant } from '../types'
+import { smlTypedValToString, smlTypeToString } from '../utils/formatters'
 
 function startRepl(
   executionMethod: ExecutionMethod = 'interpreter',
@@ -31,23 +33,54 @@ function startRepl(
         // the object being passed as argument fits the interface ReplOptions in the repl module.
         {
           eval: (cmd, unusedContext, unusedFilename, callback) => {
-            runInContext(cmd, context, options).then(obj => {
-              if (obj.status === 'finished' || obj.status === 'suspended-non-det') {
-                callback(null, obj.value)
-              } else {
-                callback(new Error(parseError(context.errors)), undefined)
+            runInContext(cmd, context, options).then(
+              obj => {
+                if (obj.status === 'finished' || obj.status === 'suspended-non-det') {
+                  callback(null, obj.value)
+                } else {
+                  callback(new Error(parseError(context.errors)), undefined)
+                }
+              },
+              error => {
+                if (
+                  error instanceof RuntimeSourceError ||
+                  error instanceof CompileTimeSourceError
+                ) {
+                  callback(null, new Error(error.explain()))
+                } else {
+                  callback(null, error)
+                }
               }
-            })
+            )
           },
-          // set depth to a large number so that `parse()` output will not be folded,
-          // setting to null also solves the problem, however a reference loop might crash
           writer: output => {
-            return typeof output === 'function'
-              ? output.toString()
-              : inspect(output, {
-                  depth: 1000,
-                  colors: true
-                })
+            try {
+              if (!output) {
+                return '>'
+              }
+              if (Array.isArray(output)) {
+                if (output.length === 0) {
+                  return '(no output)'
+                }
+                let res = '\x1b[32m'
+                for (let i = 0; i < output.length; i++) {
+                  if (i !== 0) {
+                    res += '\n'
+                  }
+                  res += `${smlTypedValToString(output[i])} : ${smlTypeToString(output[i].type)}`
+                }
+                return res + '\x1b[0m'
+              }
+              if (output.hasOwnProperty('type') && output.hasOwnProperty('value')) {
+                return `\x1b[32m${smlTypedValToString(output)} : ${smlTypeToString(
+                  output.type
+                )}\x1b[0m`
+              } else {
+                throw output
+              }
+            } catch (error) {
+              return `\x1b[31m${error.message}\x1b[0m`
+            }
           }
         }
       )

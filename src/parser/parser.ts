@@ -226,7 +226,7 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   visitNot(ctx: NotContext): es.Expression {
     return {
       type: 'UnaryExpression',
-      operator: '~',
+      operator: '!',
       prefix: true,
       argument: this.visit(ctx._right),
       loc: contextToLocation(ctx)
@@ -235,7 +235,7 @@ class ExpressionGenerator implements SmlSlangVisitor<es.Expression> {
   visitNegation(ctx: NegationContext): es.Expression {
     return {
       type: 'UnaryExpression',
-      operator: '-',
+      operator: '~',
       prefix: true,
       argument: this.visit(ctx._right),
       loc: contextToLocation(ctx)
@@ -448,12 +448,15 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   visitVarDec(ctx: VarDecContext): es.VariableDeclarator[] {
     const init = new ExpressionGenerator().visit(ctx._value) // variable value
     const pat: es.Pattern[] = new PatternGenerator().visit(ctx._identifier)
+    let id = pat[0]
 
     if (pat.length > 1) {
       // pattern matching
-      throw Error('not supported yet')
+      id = {
+        type: "ArrayPattern", 
+        elements: pat
+      }
     }
-    const id = pat[0]
 
     if (ctx.REC() && init.type === 'FunctionExpression' && id.type === 'Identifier') {
       // 'rec' can only be specified for lambdas
@@ -470,13 +473,13 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
   }
   visitFunDec(ctx: FunDecContext): es.VariableDeclarator[] {
     const params: es.Pattern[] = new PatternGenerator().visit(ctx._params)
-    const retType: SmlType = ctx._retType ? ctx._retType.accept(new TypeGenerator()) : "'a"
+    const retType: SmlType | undefined = ctx._retType ? ctx._retType.accept(new TypeGenerator()) : undefined
 
     // get type of function
     let paramsType: SmlType | SmlType[] = []
     for (let i = 0; i < params.length; i++) {
       const curr: es.Pattern = params[i]
-      paramsType.push(curr['valType'] ? curr['valType'] : "'a")
+      paramsType.push(curr['valType'])
     }
     if (paramsType.length === 1) {
       paramsType = paramsType[0]
@@ -486,7 +489,9 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
       type: 'Identifier',
       name: ctx._identifier.text!
     } as es.Identifier
-    identifier['valType'] = [paramsType, retType, 'fun']
+    identifier['valType'] = (retType || paramsType)
+      ? [paramsType, retType, 'fun']
+      : undefined 
 
     return [
       {
@@ -578,9 +583,6 @@ class DeclarationGenerator implements SmlSlangVisitor<es.VariableDeclarator[]> {
 class TypeGenerator implements SmlSlangVisitor<SmlType> {
   visitLitType(ctx: LitTypeContext): SmlType {
     const type = ctx.TYPE()._symbol.text
-    if (type === 'bool') {
-      return 'boolean'
-    }
     return type as SmlType
   }
   visitListType(ctx: ListTypeContext): SmlType {

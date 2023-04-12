@@ -22,10 +22,12 @@ export interface CustomBuiltIns {
   visualiseList: (list: any, externalContext: any) => void
 }
 
+
 export enum ErrorType {
   SYNTAX = 'Syntax',
   TYPE = 'Type',
-  RUNTIME = 'Runtime'
+  RUNTIME = 'Runtime',
+  COMPILE_TIME = "Compile Time"
 }
 
 export enum ErrorSeverity {
@@ -256,8 +258,10 @@ export type ContiguousArrayElements = ContiguousArrayElementExpression[]
 
 export type PrimitiveType = 'boolean' | 'null' | 'number' | 'string' | 'undefined'
 
+export type FreeType = `T${number}`
+
 export type SmlType =
-  | 'boolean'
+  | 'bool'
   | 'int'
   | 'string'
   | 'list'
@@ -265,6 +269,7 @@ export type SmlType =
   | "'a"
   | 'fun'
   | Array<SmlType>
+  | FreeType
 
 export interface SmlClosure {
   tag: 'closure'

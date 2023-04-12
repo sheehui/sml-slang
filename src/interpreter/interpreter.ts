@@ -2,11 +2,16 @@
 import * as es from 'estree'
 
 import { createGlobalEnvironment } from '../createContext'
+import {
+  PatternLenMatchError,
+  PatternMatchError,
+  PredicateTypeError
+} from '../errors/compileTimeSourceError'
 import { RuntimeSourceError } from '../errors/runtimeSourceError'
 import { Context, Environment, SmlType, TypedValue, Value } from '../types'
 import { Stack } from '../types'
+import * as cttc from '../utils/cttc'
 import { binaryOp, unaryOp } from '../utils/operators'
-import * as rttc from '../utils/rttc'
 
 const step_limit = 10000
 let A = new Stack<any>()
@@ -93,128 +98,260 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
   Literal: function* (node: es.Literal, _context: Context) {
     return {
       tag: 'lit',
-      val: node.value
+      val: node.value === null ? [] : node.value,
+      type: cttc.getTypeFromVal(node.value)
     }
-  },
-
-  TemplateLiteral: function* (node: es.TemplateLiteral) {
-    // Expressions like `${1}` are not allowed, so no processing needed
-    return node.quasis[0].value.cooked
-  },
-
-  ThisExpression: function* (node: es.ThisExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
   },
 
   ArrayExpression: function* (node: es.ArrayExpression, context: Context) {
     const elems = []
     const tag = node.leadingComments![0].value
 
-    for (let i = 0; i < node.elements.length; i++) {
-      const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
-      elems.push(elem)
+    // type check 
+    let type = undefined
+
+    if (tag === 'list_lit') {
+      for (let i = node.elements.length - 1; i >= 0; i--) { // right assoc
+        const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
+        elems.push(elem)
+        if (!type) {
+          type = elem.type 
+        }
+        type = cttc.unifyListLitType(type, elem.type)
+      }
+      type = cttc.getDeclaredListType(type)
+      elems.reverse()
+    } else if (tag === 'tuple_lit') {
+      type = []
+      for (let i = 0; i < node.elements.length; i++) {
+        const elem = yield* evaluators[node.elements[i]!.type](node.elements[i]!, context)
+        elems.push(elem)
+        type.push(elem.type)
+      }
+      type.push('tuple')
+    } else {
+      const left = yield* evaluators[node.elements[0]!.type](node.elements[0]!, context)
+      const right = yield* evaluators[node.elements[1]!.type](node.elements[1]!, context)
+      elems.push(left)
+      elems.push(right)
+      const op = tag === 'list_construct' ? "::" : "@" 
+      type = cttc.typeSchemeCheck(op, [left.type, right.type], undefined)?.return
     }
 
     return {
       tag, 
       elems,
       node,
-      loc: node.loc
+      loc: node.loc,
+      type
     }
   },
 
   FunctionExpression: function* (node: es.FunctionExpression, context: Context) {
-    const params = [] 
-    for (let i = 0; i < node.params.length; i++) {
-      params.push(yield* evaluators[node.params[i].type](node.params[i], context))
+    if (node.id) {
+      // recursive, so add the variable into type scheme env 
+      cttc.addToSchemeFrame(node.id.name, cttc.newSchemeVar())
+      // then eval identifier to get type annotations if any 
+      yield* evaluators[node.id.type](node.id, context)
     }
+    const params = []
+    let paramsTypes : SmlType = [] 
+
+    // extend env here to eval func block
+    const initEnv = cttc.getTypeEnv()
+    const initSchemeEnv = cttc.getSchemeEnv() 
+    cttc.extendTypeEnv([], []) 
+    cttc.extendSchemeEnv([], [])
+
+    for (let i = 0; i < node.params.length; i++) {
+      // add some unassigned type to type env (normal var by default)
+      // if it end up being a function type we handle it in the CallExpression
+      cttc.addToTypeFrame((node.params[i] as any).name, cttc.newTypeVar()) 
+
+      const param = yield* evaluators[node.params[i].type](node.params[i], context)
+      params.push(param)
+    }
+
+    const body = yield* evaluators[node.body.type](node.body, context) 
+
+    // convert params to a SmlType 
+    for (let i = 0; i < params.length; i++) {
+      paramsTypes.push(cttc.findTypeInEnv(params[i].sym))
+      if (i === params.length - 1 && i > 0) {
+        paramsTypes.push('tuple')
+      }
+    }
+    paramsTypes = paramsTypes.length === 1 
+      ? paramsTypes[0]
+      : paramsTypes
+
+    // finish eval func block so restore the env
+    cttc.restoreTypeEnv(initEnv)
+    cttc.restoreSchemeEnv(initSchemeEnv)
+
+    // check if free type var occurs in environment (para polymorphism)
+    // if it doesnt, generalise to 'a 
+    function generalise(type: SmlType) : SmlType {
+      if (!Array.isArray(type)) {
+        // search env for type 
+        if (cttc.isTypeVar(type) && !cttc.isTypeVarInEnv(type)) { // generalise 
+          cttc.forAllSet.add(type) 
+          return type
+        }
+      } else {
+        return type.map(x => generalise(x))
+      }
+      return type 
+    }
+    const type = generalise([paramsTypes, body.type, 'fun'])
     return {
       tag: 'lam', 
       params,
-      body: yield* evaluators[node.body.type](node.body, context),
-      id: node.id ? yield* evaluators[node.id.type](node.id, context) : node.id
+      body,
+      id: node.id ? yield* evaluators[node.id.type](node.id, context) : node.id,
+      type, 
     }
   },
 
-  ArrowFunctionExpression: function* (node: es.ArrowFunctionExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
+  Identifier: function* (node: es.Identifier, context: Context) {    
+    let valType = (node as any).valType
+    if (node.name === '_') {
+      return {
+        tag: 'id', 
+        sym: node.name,
+        type: valType ? valType : cttc.newTypeVar() 
+      }
+    }
+    if (!valType) {
+      valType = cttc.isInTypeEnv(node.name) 
+        ? cttc.findTypeInEnv(node.name) 
+        : cttc.findSchemeInEnv(node.name)
+    } else {
+      valType = cttc.addToTypeFrame(node.name, valType)
+    }
 
-  Identifier: function* (node: es.Identifier, context: Context) {
+
+    // convert from scheme to smltype 
+    valType = cttc.schemeToSmlType(valType)
+
     return {
       tag: 'id', 
       sym: node.name,
-      type: (node as any).valType
+      type: valType
     }
   },
 
   CallExpression: function* (node: es.CallExpression, context: Context) {
+    if (node.callee.type === 'Identifier') {
+      // param types are Tn by default, so replace with Tn -> Tn1 if needed
+      cttc.modifyTypeScheme(node.callee.name, cttc.newSchemeVar()) 
+    }
+    const fun = yield* evaluators[node.callee.type](node.callee, context)
+    const paramTypes = fun.type[0] // fun.type is a SmlType 
+
+    let argTypes = []
     const args = [] 
     for (let i = 0; i < node.arguments.length; i++) { 
-      const arg = node.arguments[i] 
-      args.push(yield* evaluators[arg.type](arg, context))
+      const arg = yield* evaluators[node.arguments[i].type](node.arguments[i], context)
+      argTypes.push(arg.type)
+      args.push(arg)
     }
+
+    // convert argTypes to a SmlType 
+    argTypes.push('tuple')
+    argTypes = argTypes.length <= 2 ? argTypes[0] : argTypes
+
+    const [unifyArgType, sub] = cttc.unifyReturnType(paramTypes, argTypes)
+    cttc.applySub(fun, sub)
+
+    const type = fun.type[1] // take the return type of fun as the call type
     return {
       tag: 'app', 
-      fun: yield* evaluators[node.callee.type](node.callee, context), 
-      args
+      fun, 
+      args,
+      type
     }
-  },
-
-  NewExpression: function* (node: es.NewExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
   },
 
   UnaryExpression: function* (node: es.UnaryExpression, context: Context) {
-    return {
+    const arg = yield* evaluators[node.argument.type](node.argument, context)    
+    const type = cttc.typeSchemeCheck(node.operator, [arg], undefined)
+    const [isEval, res] = cttc.partialEvaluate([arg], node.operator, 'unop')
+
+    return isEval ? {
+      tag: 'lit',
+      val: res,
+      type: type?.return
+    }:{
       tag: 'unop',
       sym: node.operator, 
-      arg: yield* evaluators[node.argument.type](node.argument, context),
-      loc: node.loc
+      arg,
+      loc: node.loc,
+      type: type?.return
     }
   },
 
   BinaryExpression: function* (node: es.BinaryExpression, context: Context) {
-    const frst = yield* evaluators[node.right.type](node.right, context)
-    const scnd = yield* evaluators[node.left.type](node.left, context)
+    const scnd = yield* evaluators[node.right.type](node.right, context)
+    const frst = yield* evaluators[node.left.type](node.left, context)
+    const type = cttc.typeSchemeCheck(node.operator, [frst, scnd], undefined)
+    const [isEval, res] = cttc.partialEvaluate([frst, scnd], node.operator, 'binop')
 
-    return {
+    return isEval ? {
+      tag: 'lit',
+      val: res,
+      type: type?.return
+    } : {
       tag: 'binop',
       sym: node.operator,
       frst,
       scnd,
-      loc: node.loc
+      loc: node.loc,
+      type: type?.return
     }
   },
 
   MemberExpression: function* (node: es.MemberExpression, context: Context) {
     const expr = yield* evaluators[node.object.type](node.object, context)
-            
+    const type = expr.type[(node.property as any).value]  
     return {
       tag: 'record',
       record: node.property,
       expr,
-      node
+      node,
+      type
     }
   },
 
   ConditionalExpression: function* (node: es.ConditionalExpression, context: Context) {
-    return {
+    const pred = yield* evaluators[node.test.type](node.test, context)
+    if (pred.type !== 'bool') {
+      throw new PredicateTypeError(pred.type)
+    }
+    const cons = yield* evaluators[node.consequent.type](node.consequent, context)
+    const alt = yield* evaluators[node.alternate.type](node.alternate, context)
+    const type = cttc.unifyBranches(cons.type, alt.type)[0]
+    const [isEval, res] = cttc.partialEvaluate([cons, alt], pred, 'cond')
+
+    return isEval 
+    ? res 
+    : {
       tag: 'cond_expr', 
-      pred: yield* evaluators[node.test.type](node.test, context),
-      cons: yield* evaluators[node.consequent.type](node.consequent, context),
-      alt: yield* evaluators[node.alternate.type](node.alternate, context),
-      node: node 
+      pred,
+      cons,
+      alt,
+      node: node,
+      type
     }
   },
 
-  LogicalExpression: function* (node: es.LogicalExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   VariableDeclaration: function* (node: es.VariableDeclaration, context: Context) {
-    // const decl = node.declarations[0]
-    // const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+    function initIdType(exprType: SmlType, id: string) {
+      cttc.isTypedFun(exprType) 
+        ? cttc.addToSchemeFrame(id, cttc.newSchemeVar()) 
+        : cttc.addToTypeFrame(id, cttc.newTypeVar()) 
+    }
+
     const ids = [] 
     const exprs = []
     let localStartIdx = null 
@@ -223,17 +360,91 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
 
     for (let i = 0; i < node.declarations.length; i++) {
       const decl = node.declarations[i]
-      ids.push(yield* evaluators[decl.id.type](decl.id, context))
-
       // deal with local declarations
       const locals = (decl as any).locals 
+      
       if (locals) {
+        const initEnv = cttc.getTypeEnv()
+        const initSchemeEnv = cttc.getSchemeEnv()
+        cttc.extendTypeEnv([], [])
+        cttc.extendSchemeEnv([], [])
         localStartIdx = i
         localDecs = yield* evaluators[locals.decs.type](locals.decs, context)
-        localArity = locals.arity 
+        localArity = locals.arity
+
+        const end = i + localArity 
+        while (i < end) {
+          const decl = node.declarations[i]
+          const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+          if (decl.id.type === "ArrayPattern" && cttc.isTypedTuple(expr.type)) {
+            if (decl.id.elements.length !== expr.type.length - 1) {
+              throw new PatternLenMatchError(decl.id.elements.length, expr.type.length - 1)
+            }
+            const idTupElems = []
+            for (let i = 0; i < decl.id.elements.length; i++) {
+              const currExprType = expr.type[i]
+              const elem = decl.id.elements[i]
+              if (!elem) break 
+              const sym = (elem as any).name
+              sym !== "_" && initIdType(currExprType, sym)
+
+              const id = yield* evaluators[elem.type](elem, context)
+              const type = cttc.unifyReturnType(id.type, currExprType)[0]
+              sym !== "_" && cttc.addToTypeFrame(id.sym, type, 1)
+              idTupElems.push(id) 
+            }
+            ids.push(idTupElems)
+          } else if (decl.id.type === "Identifier") {
+            initIdType(expr.type, (decl.id as any).name)
+            const id = yield* evaluators[decl.id.type](decl.id, context)
+            const type = cttc.unifyReturnType(id.type, expr.type)[0]
+            cttc.addToTypeFrame(id.sym, type, 1) 
+            
+            ids.push(id)
+          } else {
+            throw new PatternMatchError(expr.type)
+          }
+          exprs.push(expr)
+          i++  
+        }
+        cttc.restoreTypeEnv(initEnv)
+        cttc.restoreSchemeEnv(initSchemeEnv)
+        i-- 
+        continue 
       }
-      exprs.push(yield* evaluators[decl.init!.type](decl.init!, context))
+
+      const expr = yield* evaluators[decl.init!.type](decl.init!, context)
+      if (decl.id.type === "ArrayPattern" && cttc.isTypedTuple(expr.type)) {
+        if (decl.id.elements.length !== expr.type.length - 1) {
+          throw new PatternLenMatchError(decl.id.elements.length, expr.type.length - 1)
+        }
+        const idTupElems = []
+        for (let i = 0; i < decl.id.elements.length; i++) {
+          const currExprType = expr.type[i]
+          const elem = decl.id.elements[i]
+          if (!elem) break 
+          const sym = (elem as any).name
+          sym !== "_" && initIdType(currExprType, sym)
+
+          const id = yield* evaluators[elem.type](elem, context)
+          const type = cttc.unifyReturnType(id.type, currExprType)[0]
+          sym !== "_" && cttc.addToTypeFrame(id.sym, type)
+          idTupElems.push(id) 
+        }
+        ids.push(idTupElems)
+      } else if (decl.id.type === "Identifier") {
+        initIdType(expr.type, (decl.id as any).name)
+        const id = yield* evaluators[decl.id.type](decl.id, context)
+        const type = cttc.unifyReturnType(id.type, expr.type)[0]
+        cttc.addToTypeFrame(id.sym, type) 
+        
+        ids.push(id)
+      } else {
+        throw new PatternMatchError(expr.type)
+      }
+      exprs.push(expr)
     }
+
     return {
       tag: 'var',
       ids, 
@@ -244,68 +455,61 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     }
   },
 
-  ContinueStatement: function* (_node: es.ContinueStatement, _context: Context) {
-    throw new Error(`not supported yet: ${_node.type}`)
-  },
-
-  BreakStatement: function* (_node: es.BreakStatement, _context: Context) {
-    throw new Error(`not supported yet: ${_node.type}`)
-  },
-
-  ForStatement: function* (node: es.ForStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-
-  AssignmentExpression: function* (node: es.AssignmentExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  FunctionDeclaration: function* (node: es.FunctionDeclaration, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  IfStatement: function* (node: es.IfStatement | es.ConditionalExpression, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
   ExpressionStatement: function* (node: es.ExpressionStatement, context: Context) {
     return yield* evaluators[node.expression.type](node.expression, context)
   },
 
   SequenceExpression: function* (node: es.SequenceExpression, context: Context) {
     const body = []
-    for (let i = 0; i < node.expressions.length; i++) {
-      const expr = node.expressions[i]
-      body.push(yield* evaluators[expr.type](expr, context))
+    let type = undefined 
+    const locals = (node as any).locals
+    const initEnv = cttc.getTypeEnv()
+    const initSchemeEnv = cttc.getSchemeEnv()  
+    if (locals) {
+      cttc.extendTypeEnv([], []) 
+      cttc.extendSchemeEnv([], [])
+      const localDecs = yield* evaluators[locals.type](locals, context)
+      body.push(localDecs)
     }
-    const locals = (node as any).locals 
+
+    for (let i = 0; i < node.expressions.length; i++) {
+      const expr = yield* evaluators[node.expressions[i].type](node.expressions[i], context)
+      body.push(expr)
+      if (i === node.expressions.length - 1) {
+        type = expr.type
+      }
+    }
+    if (locals) {
+      // restore env 
+      cttc.restoreTypeEnv(initEnv)
+      cttc.restoreSchemeEnv(initSchemeEnv) 
+    }
+    
     return locals ? {
       tag: 'blk', 
       body: { 
         tag: 'seq', 
-        body: [yield* evaluators[locals.type](locals, context), ...body] 
-      }
+        body,
+        type
+      },
+      type
     } : {
       tag: 'seq',
       body,
+      type 
     }
   },
 
-  ReturnStatement: function* (node: es.ReturnStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-  WhileStatement: function* (node: es.WhileStatement, context: Context) {
-    throw new Error(`not supported yet: ${node.type}`)
-  },
-
-
   BlockStatement: function* (node: es.BlockStatement, context: Context) {
     const stmts = []; 
+    let type = undefined
     for (let i = 0; i < node.body.length; i++) {
       const expr = node.body[i]
-      stmts.push(yield* evaluators[expr.type](expr, context))
+      const stmt = yield* evaluators[expr.type](expr, context)
+      stmts.push(stmt)
+      if (i === node.body.length - 1) {
+        type = stmt.type 
+      }
     }
     const jsonBody = node.body.length > 1 ? {
       tag: 'seq',
@@ -314,24 +518,25 @@ export const evaluators: { [nodeType: string]: Evaluator<es.Node> } = {
     
     return {
       tag: 'blk',
-      body: jsonBody
+      body: jsonBody,
+      type
     }
   },
 
   Program: function* (node: es.BlockStatement, context: Context) {
-    const progBlk = node.body[0]
-    return yield* evaluators[progBlk.type](progBlk, context); 
+    const progBlk = node.body[0] as es.BlockStatement
+    if (progBlk.body.length !== 0) {
+      return yield* evaluators[progBlk.type](progBlk, context); 
+    }
   }
-  
 }
 
 const microcode: { [tag: string]: Function } = {
-  blk: (cmd: { body: any; isCheck: boolean }) => {
+  blk: (cmd: { body: any }) => {
     if (A.size() > 0) {
       A.push({ tag: 'env_i', env: E })
     }
     const body = cmd.body
-    body['isCheck'] = cmd.isCheck
     A.push(body)
 
     // extend environment by 1 frame for block
@@ -342,10 +547,9 @@ const microcode: { [tag: string]: Function } = {
       name: 'program'
     }
   },
-  seq: (cmd: { body: any[]; isCheck: boolean }) => {
+  seq: (cmd: { body: any[] }) => {
     for (let i = cmd.body.length - 1; i >= 0; i--) {
       const expr = cmd.body[i]
-      expr['isCheck'] = cmd.isCheck
       A.push(expr)
       if (i === 0) {
         continue
@@ -353,10 +557,10 @@ const microcode: { [tag: string]: Function } = {
       A.push({ tag: 'pop_i' })
     }
   },
-  lit: (cmd: { val: any; isCheck: boolean }) => {
-    S.push(rttc.getTypedLiteral(cmd.val))
+  lit: (cmd: { val: any; type: SmlType }) => {
+    S.push({ type: cmd.type, value: cmd.val })
   },
-  id: (cmd: { sym: string; isCheck: boolean }) => {
+  id: (cmd: { sym: string }) => {
     let env: Environment | null = E
     while (env) {
       const frame = env.head
@@ -367,30 +571,21 @@ const microcode: { [tag: string]: Function } = {
     }
     throw Error(`Unbound variable ${cmd.sym}`)
   },
-  binop: (cmd: {
-    sym: es.BinaryOperator
-    scnd: any
-    frst: any
-    loc: es.SourceLocation
-    isCheck: boolean
-  }) => {
+  binop: (cmd: { sym: es.BinaryOperator; scnd: any; frst: any; type: SmlType }) => {
     A.push({
-      tag: cmd.isCheck ? 'binop_check_i' : 'binop_i',
+      tag: 'binop_i',
       sym: cmd.sym,
-      loc: cmd.loc
+      type: cmd.type
     })
-    cmd.frst['isCheck'] = cmd.isCheck
-    cmd.scnd['isCheck'] = cmd.isCheck
-    A.push(cmd.frst)
     A.push(cmd.scnd)
+    A.push(cmd.frst)
   },
-  unop: (cmd: { sym: es.BinaryOperator; arg: any; loc: es.SourceLocation; isCheck: boolean }) => {
+  unop: (cmd: { sym: es.BinaryOperator; arg: any; type: SmlType }) => {
     A.push({
-      tag: cmd.isCheck ? 'unop_check_i' : 'unop_i',
+      tag: 'unop_i',
       sym: cmd.sym,
-      loc: cmd.loc
+      type: cmd.type
     })
-    cmd.arg['isCheck'] = cmd.isCheck
     A.push(cmd.arg)
   },
   var: (cmd: {
@@ -399,7 +594,6 @@ const microcode: { [tag: string]: Function } = {
     localStartIdx: number
     localArity: number
     localDecs: any
-    isCheck: boolean
   }) => {
     for (let i = cmd.exprs.length - 1; i >= 0; i--) {
       if (cmd.localStartIdx !== null && i === cmd.localStartIdx + cmd.localArity - 1) {
@@ -412,8 +606,7 @@ const microcode: { [tag: string]: Function } = {
         id: cmd.ids[i],
         expr: cmd.exprs[i],
         // frameOffset to skip the temp frame (if declaration is within 'local...in<HERE>end')
-        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0,
-        isCheck: cmd.isCheck
+        frameOffset: i >= cmd.localStartIdx && i < cmd.localStartIdx + cmd.localArity ? 1 : 0
       })
 
       if (i !== 0) {
@@ -436,202 +629,120 @@ const microcode: { [tag: string]: Function } = {
       }
     }
   },
-  assmt: (cmd: { id: any; expr: any; frameOffset: number; isCheck: boolean }) => {
+  assmt: (cmd: { id: any; expr: any; frameOffset: number }) => {
     A.push({ tag: 'assmt_i', id: cmd.id, frameOffset: cmd.frameOffset })
-    cmd.expr['isCheck'] = cmd.isCheck
     A.push(cmd.expr)
   },
-  lam: (cmd: { params: any[]; body: es.BlockStatement; id: any }) => {
-    A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E })
-
-    // check vars + types within function
-    if (A.size() > 0) {
-      A.push({ tag: 'env_i', env: E })
-    }
-
-    const body = { ...cmd.body, isCheck: true }
-    A.push(body)
-
-    // extend environment by 1 frame for block
-    const head = {}
-    cmd.params.forEach(param => (head[param.sym] = { type: param.type, value: null }))
-    if (cmd.id) {
-      // allows recursive functions (for 'fun' declarations only)
-      head[cmd.id.sym] = { type: cmd.id.type, value: null }
-    }
-    E = {
-      head,
-      tail: E,
-      id: E.id,
-      name: 'program'
-    }
+  lam: (cmd: { params: any[]; body: es.BlockStatement; id: any; type: SmlType }) => {
+    A.push({ tag: 'closure_i', params: cmd.params, body: cmd.body, env: E, type: cmd.type })
   },
-  list_lit: (cmd: { elems: any[]; isCheck: boolean; node: es.ArrayExpression }) => {
-    !cmd.isCheck && A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node })
+  list_lit: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
+    A.push({ tag: 'list_lit_i', len: cmd.elems.length, node: cmd.node, type: cmd.type })
     cmd.elems.forEach(x => {
-      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  list_append: (cmd: {
-    elems: any[]
-    isCheck: boolean
-    node: es.ArrayExpression
-    loc: es.SourceLocation
-  }) => {
-    !cmd.isCheck && A.push({ tag: 'list_append_i', len: cmd.elems.length, loc: cmd.loc })
+  list_append: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
+    A.push({ tag: 'list_append_i', type: cmd.type })
     cmd.elems.forEach(x => {
-      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  list_construct: (cmd: {
-    elems: any[]
-    isCheck: boolean
-    node: es.ArrayExpression
-    loc: es.SourceLocation
-  }) => {
-    !cmd.isCheck && A.push({ tag: 'list_construct_i', loc: cmd.loc })
+  list_construct: (cmd: { elems: any[]; node: es.ArrayExpression; type: SmlType }) => {
+    A.push({ tag: 'list_construct_i', type: cmd.type })
     cmd.elems.forEach(x => {
-      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  tuple_lit: (cmd: { elems: any[]; isCheck: boolean; node: es.ArrayExpression }) => {
-    !cmd.isCheck && A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
+  tuple_lit: (cmd: { elems: any[]; node: es.ArrayExpression }) => {
+    A.push({ tag: 'tuple_lit_i', len: cmd.elems.length })
     cmd.elems.forEach(x => {
-      x['isCheck'] = cmd.isCheck
       A.push(x)
     })
   },
-  record: (cmd: { record: any; expr: any; node: es.MemberExpression; isCheck: boolean }) => {
+  record: (cmd: { record: any; expr: any; node: es.MemberExpression }) => {
     const index = cmd.record.value - 1 // input is 1-indexed
-    !cmd.isCheck && A.push({ tag: 'record_i', index, node: cmd.node })
+    A.push({ tag: 'record_i', index, node: cmd.node })
 
     if (cmd.expr.type === 'Identifier') {
-      A.push({ tag: 'id', sym: cmd.expr.name, isCheck: cmd.isCheck })
+      A.push({ tag: 'id', sym: cmd.expr.name })
     } else {
-      cmd.expr['isCheck'] = cmd.isCheck
       A.push(cmd.expr)
     }
   },
-  app: (cmd: { args: any[]; fun: any; isCheck: boolean }) => {
-    A.push({ tag: 'app_i', arity: cmd.args.length, isCheck: cmd.isCheck })
+  app: (cmd: { args: any[]; fun: any }) => {
+    A.push({ tag: 'app_i', arity: cmd.args.length })
     for (let i = 0; i < cmd.args.length; i++) {
-      cmd.args[i]['isCheck'] = cmd.isCheck
       A.push(cmd.args[i])
     }
-    cmd.fun['isCheck'] = cmd.isCheck
     A.push(cmd.fun)
   },
-  cond_expr: (cmd: {
-    pred: any
-    cons: any
-    alt: any
-    node: es.ConditionalExpression
-    isCheck: boolean
-  }) => {
-    if (!cmd.isCheck) {
-      // actually evaluate the cons and alt in 'branch_i' 
-      A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node, isCheck: cmd.isCheck })
-      cmd.pred['isCheck'] = cmd.isCheck 
-      A.push(cmd.pred)
-    }
-
-    // type check, 'branch_check_i' does not eval cons and alt
-    A.push({ tag: 'branch_check_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node })
-    A.push({...cmd.cons, isCheck: true })
-    A.push({...cmd.alt, isCheck: true })
-    
-    A.push({...cmd.pred, isCheck: true})
-    
-    
+  cond_expr: (cmd: { pred: any; cons: any; alt: any; node: es.ConditionalExpression }) => {
+    A.push({ tag: 'branch_i', cons: cmd.cons, alt: cmd.alt, node: cmd.node })
+    A.push(cmd.pred)
   },
-  binop_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
+  binop_i: (cmd: { sym: es.BinaryOperator; type: SmlType }) => {
     const right = S.pop()
     const left = S.pop()
-    const result = binaryOp(cmd.sym, left, right, cmd.loc)
-    S.push(rttc.getTypedLiteral(result))
+    const value = binaryOp(cmd.sym, left, right)
+    S.push({ type: cmd.type, value })
   },
-  binop_check_i: (cmd: { sym: es.BinaryOperator; loc: es.SourceLocation }) => {
-    const right = S.pop()
-    const left = S.pop()
-    // check if types match operator
-    const dummyNode: es.Node = { type: 'Literal', value: null }
-    const typeError = rttc.checkBinaryExpression(dummyNode, cmd.sym, left, right)
-    if (typeError) {
-      throw typeError
-    }
-    // push some dummy object containing type onto stack
-    S.push({ type: rttc.operatorToResultType(cmd.sym), value: null })
-  },
-  unop_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
+  unop_i: (cmd: { sym: es.UnaryOperator; type: SmlType }) => {
     const arg = S.pop()
-    const result = unaryOp(cmd.sym, arg, cmd.loc)
-    S.push(rttc.getTypedLiteral(result))
-  },
-  unop_check_i: (cmd: { sym: es.UnaryOperator; loc: es.SourceLocation }) => {
-    const arg = S.pop()
-    // check if type match operator
-    const dummyNode: es.Node = { type: 'Literal', value: null }
-    const typeError = rttc.checkUnaryExpression(dummyNode, cmd.sym, arg)
-    if (typeError) {
-      throw typeError
-    }
-    // push some dummy object containing type onto stack
-    S.push({ type: rttc.operatorToResultType(cmd.sym), value: null })
+    const value = unaryOp(cmd.sym, arg)
+    S.push({ type: cmd.type, value })
   },
   env_i: (cmd: { env: Environment }) => {
     E = cmd.env
   },
   assmt_i: (cmd: { id: any; frameOffset: number }) => {
-    const val = S.peek() 
-    const valType = val.type
-    const idType = cmd.id.type 
-    if (idType && !rttc.isTypeArrSubset(valType, idType)) {
-      // used dummy node for now, lazy pass node
-      const dummyNode: es.Node = { type: 'Literal', value: null }
-      throw new rttc.TypeError(
-        dummyNode,
-        ' as assigned value',
-        rttc.typeToString(idType),
-        rttc.typeToString(valType)
-      )
+    const val = S.peek()
+    if (Array.isArray(cmd.id)) {
+      S.pop()
+      const patt = []
+      for (let i = 0; i < val.value.length; i++) {
+        const curr = cmd.id[i]
+        if (curr.sym === '_') continue
+        if (cmd.frameOffset && E.tail) {
+          E.tail.head[curr.sym] = val.value[i]
+          continue
+        }
+        E.head[curr.sym] = { value: val.value[i], type: val.type[i] }
+        patt.push({ value: val.value[i], type: val.type[i] })
+      }
+      S.push(patt)
+    } else {
+      if (cmd.frameOffset && E.tail) {
+        return (E.tail.head[cmd.id.sym] = val)
+      }
+      if (cmd.id.sym === '_') {
+        S.pop()
+        S.push([])
+      } else {
+        E.head[cmd.id.sym] = val
+      }
     }
-    if (cmd.frameOffset && E.tail) {
-      return (E.tail.head[cmd.id.sym] = val)
-    }
-    E.head[cmd.id.sym] = val
   },
-  list_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
+  list_lit_i: (cmd: { len: number; node: es.ArrayExpression; type: SmlType }) => {
     const list = []
-    let type = undefined
-
     for (let i = 0; i < cmd.len; i++) {
       const elem: TypedValue = S.pop()
-
-      if (type == undefined) {
-        type = elem
-      }
-
-      type = rttc.updateListType(type, elem, cmd.node)
-
       list.push(elem.value)
     }
 
-    S.push(rttc.getDeclaredTypedList(type, list))
+    S.push({ type: cmd.type, value: list })
   },
-  list_append_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+  list_append_i: (cmd: { node: es.ArrayExpression; type: SmlType }) => {
     const left = S.pop()
     const right = S.pop()
-    const result = binaryOp('@', left, right, cmd.loc)
-    S.push(rttc.getAppendedTypedList(left, right, result))
+    const value = binaryOp('@', left, right)
+    S.push({ type: cmd.type, value })
   },
-  list_construct_i: (cmd: { node: es.ArrayExpression; loc: es.SourceLocation }) => {
+  list_construct_i: (cmd: { node: es.ArrayExpression; type: SmlType }) => {
     const left = S.pop()
     const right = S.pop()
-    const result = binaryOp('::', left, right, cmd.loc)
-    S.push(rttc.getConstructedTypedList(left, right, result))
+    const value = binaryOp('::', left, right)
+    S.push({ type: cmd.type, value })
   },
   tuple_lit_i: (cmd: { len: number; node: es.ArrayExpression }) => {
     const tuple = []
@@ -639,55 +750,33 @@ const microcode: { [tag: string]: Function } = {
     for (let i = 0; i < cmd.len; i++) {
       const elem = S.pop()
       tuple.push(elem.value)
-      type.push(rttc.getElemType(elem))
+      type.push(elem.type)
     }
     type.push('tuple')
     S.push({ type: type, value: tuple })
   },
   record_i: (cmd: { index: number; node: es.MemberExpression }) => {
     const tuple = S.pop()
-    S.push(rttc.getTypedTupleElem(cmd.node, tuple, cmd.index))
+    S.push({ type: tuple.type[cmd.index], value: tuple.value[cmd.index] })
   },
   app_i: (cmd: { arity: number; isCheck: boolean }) => {
     const args = []
     for (let i = 0; i < cmd.arity; i++) {
       args.push(S.pop())
     }
-    let func = S.pop()
+    const func = S.pop().value
 
-    // check if func params type match
-    const paramsTypes = func.type[0]
-    const argsTypes = args.length > 1
-      ? args.reduce((x, y) => {
-          x.push(y.type)
-          return x
-        }, [])
-      : args[0].type
-    if (args.length > 1) {
-      argsTypes.push('tuple')
+    // tail call
+    if (A.size() !== 0 && A.peek().tag !== 'env_i') {
+      A.push({ tag: 'env_i', env: E })
     }
-    if (!rttc.isTypeArrSubset(argsTypes, paramsTypes as SmlType)) {
-      const dummyNode: es.Node = { type: 'Literal', value: null }
-      throw new rttc.TypeError(dummyNode, ' as argument to function', rttc.typeToString(paramsTypes), rttc.typeToString(argsTypes))
-    }
-
-    if (cmd.isCheck) {
-      // no need to evaluate body, just push the return type 
-      return S.push({ type: func.type[1], value: null })
-    }
-
-    func = func.value
-
-    // TODO: Implement tail call
-    A.push({ tag: 'env_i', env: E })
 
     A.push(func.body)
     // set E to the function env, extended with params and args
     const newFrame = {}
     for (let j = 0; j < cmd.arity; j++) {
-      newFrame[func.params[j]] = args[j]
+      newFrame[func.params[j].sym] = args[j]
     }
-    console.log(newFrame, "NEWFRAME")
     E = {
       head: newFrame,
       tail: func.env,
@@ -696,56 +785,18 @@ const microcode: { [tag: string]: Function } = {
     }
   },
   branch_i: (cmd: { cons: any; alt: any; node: es.ConditionalExpression; isCheck: boolean }) => {
-    const pred = S.pop() 
+    const pred = S.pop()
     A.push(pred.value ? cmd.cons : cmd.alt)
   },
-  branch_check_i: (cmd: { cons: any; alt: any; node: es.ConditionalExpression }) => {
-    const consVal = S.pop()
-    const altVal = S.pop()
-
-    const subsetOfConsAlt = rttc.isTypeArrSubset(consVal.type, altVal.type)
-    const subsetOfAltCons = rttc.isTypeArrSubset(altVal.type, consVal.type)
-
-    // check if neither types of cons and alt are subsets of the other
-    if (!subsetOfConsAlt || !subsetOfAltCons) {
-      throw Error(`Match rules disagree on type: Cannot merge '${consVal.type}' and '${altVal.type}'`)
+  closure_i: (cmd: { params: any[]; body: any; env: Environment; type: SmlType }) => {
+    const value = {
+      tag: 'closure',
+      params: cmd.params,
+      body: cmd.body,
+      env: cmd.env,
+      type: cmd.type
     }
-
-    const pred = S.pop()
-    if (!rttc.typeArrEqual(pred.type, 'boolean')) {
-      throw new rttc.TypeError(cmd.node, " as predicate", 'boolean', pred.type)
-    }
-     
-    // push type of conditional expr onto stack (take the most constraining type)
-    S.push({ 
-      type: subsetOfConsAlt ? subsetOfConsAlt : subsetOfAltCons,
-      value: null 
-    })
-  },
-  closure_i: (cmd: { params: any[]; body: any; env: Environment }) => {
-    // for now, parameter types are all given
-    // extract types from list of param objects
-    const paramsTypes = cmd.params.length > 1
-      ? cmd.params.reduce((x, y) => {
-        x.push(y.type)
-        return x 
-      }, [])
-      : cmd.params[0].type
-    if (cmd.params.length > 1) {
-      paramsTypes.push('tuple')
-    }
-    const retType = S.pop().type // type of function body is on the stash after checks
-
-    S.push({
-      type: [paramsTypes, retType, 'fun'],
-      value: {
-        tag: 'closure',
-        params: cmd.params.map(param => param.sym),
-        body: cmd.body,
-        env: cmd.env
-      }
-    })
-    // S.push({ tag: 'closure', params: cmd.params, body: cmd.body, env: cmd.env })
+    S.push({ type: cmd.type, value })
   },
   pop_i: () => {
     S.pop()
@@ -757,14 +808,16 @@ export function* evaluate(node: es.Node, context: Context): any {
   A = new Stack<any>()
   S = new Stack<Value>()
   E = createGlobalEnvironment()
-  console.log('=====START EVALUATION=====')
+  cttc.resetTypeEnv()
+  cttc.resetSchemeEnv()
+  // console.log('=====START EVALUATION=====')
   A.push(yield* evaluators[node.type](node, context))
   let i = 0
   while (i < step_limit) {
     if (A.size() === 0) break
     const cmd = A.pop()
-    console.log('\n=====instruction====')
-    console.log(cmd)
+    // console.log('\n=====instruction====')
+    // console.log(cmd)
     // console.log("\n=====agenda====")
     // A.print()
     if (cmd && microcode.hasOwnProperty(cmd.tag)) {
@@ -774,15 +827,17 @@ export function* evaluate(node: es.Node, context: Context): any {
       // console.log('after stash:')
       // S.print() // print stash
     } else {
-      console.log('error')
+      // throw Error('Bad command')
     }
     i++
   }
 
   // const result = yield* evaluators[node.type](node, context)
   yield* leave(context)
-  console.log('\n=====EXIT EVALUATION=====\n')
+  // console.log('\n=====EXIT EVALUATION=====\n')
   const r = S.pop()
-  console.log(r)
-  return r.value
+  // console.log(r)
+  // console.log(cttc.getTypeEnv().head)
+  // console.log(cttc.getSchemeEnv().head)
+  return r
 }

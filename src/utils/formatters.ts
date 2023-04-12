@@ -1,3 +1,6 @@
+import { SmlType, TypedValue } from '../types'
+import { FunctionType } from '../utils/cttc'
+
 function templateToString(content: TemplateStringsArray | string, variables: any[]): string {
   if (typeof content === 'string') {
     return content
@@ -42,4 +45,139 @@ export function simplify(content: string, maxLength = 15, separator = '...') {
   }
   const charsToTake = Math.ceil(maxLength - separator.length / 2)
   return content.slice(0, charsToTake) + ' ... ' + content.slice(charsToTake)
+}
+
+export const functionTypeToString = (type: FunctionType): string => {
+  let result = ''
+
+  for (let i = 0; i < type.args.length; i++) {
+    const element = type.args[i]
+    if (i !== 0) {
+      result += ' * '
+    }
+
+    result += smlTypeToString(element)
+  }
+
+  result += ' -> '
+
+  result += smlTypeToString(type.return) // abit sus
+
+  return result
+}
+
+export const argToString = (type: FunctionType): string => {
+  let result = ''
+
+  for (let i = 0; i < type.args.length; i++) {
+    const element = type.args[i]
+    if (i !== 0) {
+      result += ' * '
+    }
+
+    result += smlTypeToString(element)
+  }
+
+  return result
+}
+const clone = (items: any[]): any =>
+  items.map((item: any) => (Array.isArray(item) ? clone(item) : item))
+
+export const smlTypedValToString = (sml: TypedValue): string => {
+  if (typeof sml.type === 'string') {
+    return sml.value.toString()
+  }
+  const isTypeArr = Array.isArray(sml.type)
+  if (isTypeArr && sml.type[sml.type.length - 1] == 'list') {
+    let str = '['
+
+    if (!Array.isArray(sml.value)) {
+      throw Error('bad value')
+    }
+
+    for (let i = 0; i < sml.value.length; i++) {
+      const element = sml.value[i]
+      let copy = clone(sml.type)
+      if (copy.length === 2 && Array.isArray(copy[0])) {
+        copy = copy[0]
+      } else {
+        copy.pop()
+      }
+      str += smlTypedValToString({
+        type: copy,
+        value: element
+      })
+      if (i !== sml.value.length - 1) {
+        str += ', '
+      }
+    }
+
+    return str + ']'
+  } else if (isTypeArr && sml.type[sml.type.length - 1] == 'tuple') {
+    let str = '('
+
+    if (!Array.isArray(sml.value)) {
+      throw Error('bad value')
+    }
+
+    for (let i = 0; i < sml.type.length - 1; i++) {
+      const type = sml.type[i]
+      str += smlTypedValToString({
+        type,
+        value: sml.value[i]
+      })
+      if (i !== sml.value.length - 1) {
+        str += ', '
+      }
+    }
+
+    str += ')'
+
+    return str
+  } else if (isTypeArr && sml.type[sml.type.length - 1] == 'fun') {
+    return 'fn'
+  } else {
+    return sml.value.toString()
+  }
+}
+
+export const smlTypeToString = (type: SmlType): string => {
+  const isTypeArr = Array.isArray(type)
+  if (isTypeArr && type[type.length - 1] == 'list') {
+    let str = ''
+
+    type.forEach((element: SmlType | Array<SmlType>) => {
+      if (Array.isArray(element)) {
+        str += ' ' + smlTypeToString(element)
+      } else {
+        str += ' ' + element
+      }
+    })
+
+    return str.trim()
+  } else if (isTypeArr && type[type.length - 1] == 'tuple') {
+    let str = '('
+
+    for (let i = 0; i < type.length - 1; i++) {
+      const element = type[i]
+      if (i !== 0) {
+        str += ' * '
+      }
+      if (Array.isArray(element)) {
+        str += smlTypeToString(element)
+      } else {
+        str += element
+      }
+    }
+    str += ')'
+
+    return str
+  } else if (isTypeArr && type[type.length - 1] == 'fun') {
+    const paramsType = Array.isArray(type[0]) ? smlTypeToString(type[0]) : type[0]
+    const retType = Array.isArray(type[1]) ? smlTypeToString(type[1]) : type[1]
+
+    return `${paramsType} -> ${retType}`
+  } else {
+    return type.toString()
+  }
 }
