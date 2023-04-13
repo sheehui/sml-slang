@@ -72,3 +72,78 @@ describe('tuple access', () => {
     })
   })
 })
+
+/**
+ * BASIC PATTERN MATCHING
+ */
+
+describe('basic pattern matching', () => {
+  test('basic pattern matching with identifiers', () => {
+    const code: string = `
+      val (x,y,z) = (1,2,3);
+      x; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual({
+        type: 'int',
+        value: 1
+      })
+    })
+  })
+
+  test('basic pattern matching with identifiers and wildcard', () => {
+    const code: string = `
+      val (x,_) = (1, 2);
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([{
+        type: 'int',
+        value: 1
+      }])
+    })
+  })
+
+  test('only wildcard', () => {
+    const code: string = 'val _ = 2;'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([])
+    })
+  })
+
+  test('different number of entries', () => {
+    const code: string = 'val (x, y) = (1,2,3);'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch('Expected a record type with 2 entries, but the given record has 3 entries.')
+    })
+  })
+
+  test('incompatible type', () => {
+    const code: string = 'val (x, y) = 1;'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch("Expected pattern of record type, got \"int\".")
+    })
+  })
+
+  test('type annotations within pattern', () => {
+    const code: string = 'val (x: int, y: bool, z: string) = (1, true, "hello");'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual([{
+        type: 'int',
+        value: 1
+      }, {
+        type: 'bool',
+        value: true
+      }, {
+        type: 'string',
+        value: "hello"
+      }])
+    })
+  })
+
+  test('does not match type annotations', () => {
+    const code: string = 'val (x: int, y: bool, z: string) = (1, true, false);'
+    return runInContext(code, context, options).catch(error => {
+      expect(error.explain()).toMatch("The annotated type \"string\" does not match expression's type \"bool\".")
+    })
+  })
+})

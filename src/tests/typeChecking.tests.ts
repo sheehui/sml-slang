@@ -243,3 +243,58 @@ describe('type annotations', () => {
     })
   })
   
+/**
+ * TYPE INFERENCE
+ */
+describe('type inference', () => {
+  test('function type inference', () => {
+    const code: string = 'fun test x = x + 1'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual(["int", "int", "fun"])
+    })
+  })
+
+  test('function call type inference', () => {
+    const code: string = 'fun test x = x(1) + 1'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual([["int", "int", "fun"], "int", "fun"])
+    })
+  })
+
+  test('type inference from variable', () => {
+    const code: string = `
+      val x = 1;
+      val a = 2;  
+      val y = true; 
+      val z = if y then x else a; 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual("int")
+    })
+  })
+
+  // parametric polymorphism
+
+  test('function should take in args of more than one type', () => {
+    const code: string = `
+      fun test x = 1;
+      (test(1), test(true), test("hello"))
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value.type).toStrictEqual(["int", "int", "int", "tuple"])
+    })
+  })
+
+  test('identity function', () => {
+    const code: string = `
+      val x = fn y => y; 
+      (x(1), x(true)); 
+    `
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual({
+        type: ["int", "bool", "tuple"], 
+        value: [1, true]
+      })
+    })
+  })
+})

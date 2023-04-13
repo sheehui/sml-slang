@@ -276,3 +276,27 @@ describe('list append with @', () => {
     })
   })
 })
+
+// LIST OPERATOR PRECEDENCE
+
+describe('list operator precedence', () => {
+  test('left associative basic', () => {
+    const code: string = 'val x = [2]@3::[1];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual({
+        type: ['int', 'list'],
+        value: [2, 3, 1]
+      })
+    })
+  })
+
+  test('left associative complex', () => {
+    const code: string = 'val x = [[(1, 2)]::[[(3, 4)]], [[(5, 6)]]@[(7, 8)]::nil];'
+    return runInContext(code, context, options).then(data => {
+      expect((data as Finished).value).toStrictEqual({
+        type: [['int', 'int', 'tuple'], 'list', 'list', 'list'],
+        value: [[[[1, 2]], [[3, 4]]], [[[5, 6]], [[7, 8]]]]
+      })
+    })
+  })
+})
